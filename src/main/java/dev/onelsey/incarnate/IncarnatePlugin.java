@@ -1,0 +1,67 @@
+package dev.onelsey.incarnate;
+
+import dev.onelsey.incarnate.ability.AbilityRegistry;
+import dev.onelsey.incarnate.command.IncarnateCommand;
+import dev.onelsey.incarnate.command.PossessCommand;
+import dev.onelsey.incarnate.command.ReleaseCommand;
+import dev.onelsey.incarnate.listener.SessionListener;
+import dev.onelsey.incarnate.movement.ControllerRegistry;
+import dev.onelsey.incarnate.possession.PossessionManager;
+import dev.onelsey.incarnate.visibility.PossessionVisibilityManager;
+import org.bukkit.entity.EntityType;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.EnumSet;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+
+public final class IncarnatePlugin extends JavaPlugin {
+    private PossessionManager possessions;
+
+    @Override
+    public void onEnable() {
+        saveDefaultConfig();
+
+        Set<EntityType> excluded = loadExcludedTypes();
+        ControllerRegistry controllers = new ControllerRegistry(getConfig());
+        AbilityRegistry abilities = new AbilityRegistry(getConfig());
+        PossessionVisibilityManager visibility = new PossessionVisibilityManager(this);
+        possessions = new PossessionManager(this, controllers, abilities, visibility, excluded);
+
+        IncarnateCommand incarnateCommand = new IncarnateCommand(possessions);
+        Objects.requireNonNull(getCommand("incarnate")).setExecutor(incarnateCommand);
+        Objects.requireNonNull(getCommand("incarnate")).setTabCompleter(incarnateCommand);
+        Objects.requireNonNull(getCommand("possess")).setExecutor(new PossessCommand(
+            possessions,
+            getConfig().getDouble("control.max-possession-distance", 8.0)
+        ));
+        Objects.requireNonNull(getCommand("release")).setExecutor(new ReleaseCommand(possessions));
+
+        getServer().getPluginManager().registerEvents(new SessionListener(this, possessions), this);
+        possessions.recoverAlreadyOnlinePlayers();
+        getLogger().info("Incarnate 0.1.0 enabled for Minecraft 26.2+ (Paper/Purpur/Leaf/Folia).");
+    }
+
+    @Override
+    public void onDisable() {
+        if (possessions != null) {
+            possessions.shutdown();
+        }
+    }
+
+    private Set<EntityType> loadExcludedTypes() {
+        Set<EntityType> excluded = EnumSet.noneOf(EntityType.class);
+        excluded.add(EntityType.ENDER_DRAGON);
+        excluded.add(EntityType.SHULKER);
+
+        for (String raw : getConfig().getStringList("excluded-types")) {
+            try {
+                excluded.add(EntityType.valueOf(raw.toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException ex) {
+                getLogger().warning("Unknown excluded entity type in config.yml: " + raw);
+            }
+        }
+        return excluded;
+    }
+}
