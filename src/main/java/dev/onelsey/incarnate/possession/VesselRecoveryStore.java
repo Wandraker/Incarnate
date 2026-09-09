@@ -2,13 +2,17 @@ package dev.onelsey.incarnate.possession;
 
 import dev.onelsey.incarnate.IncarnatePlugin;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Location;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Guardian;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Ravager;
+import org.bukkit.entity.Shulker;
 import org.bukkit.entity.Sittable;
 import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.Vex;
@@ -39,6 +43,12 @@ public final class VesselRecoveryStore {
     private final NamespacedKey ravagerStunnedTicksKey;
     private final NamespacedKey ravagerRoarTicksKey;
     private final NamespacedKey spellcasterSpellKey;
+    private final NamespacedKey dragonPhaseKey;
+    private final NamespacedKey dragonPodiumXKey;
+    private final NamespacedKey dragonPodiumYKey;
+    private final NamespacedKey dragonPodiumZKey;
+    private final NamespacedKey shulkerPeekKey;
+    private final NamespacedKey shulkerAttachedFaceKey;
 
     public VesselRecoveryStore(IncarnatePlugin plugin) {
         this.index = new VesselRecoveryIndex(plugin);
@@ -61,6 +71,12 @@ public final class VesselRecoveryStore {
         this.ravagerStunnedTicksKey = new NamespacedKey(plugin, "vessel_recovery_ravager_stunned_ticks");
         this.ravagerRoarTicksKey = new NamespacedKey(plugin, "vessel_recovery_ravager_roar_ticks");
         this.spellcasterSpellKey = new NamespacedKey(plugin, "vessel_recovery_spellcaster_spell");
+        this.dragonPhaseKey = new NamespacedKey(plugin, "vessel_recovery_dragon_phase");
+        this.dragonPodiumXKey = new NamespacedKey(plugin, "vessel_recovery_dragon_podium_x");
+        this.dragonPodiumYKey = new NamespacedKey(plugin, "vessel_recovery_dragon_podium_y");
+        this.dragonPodiumZKey = new NamespacedKey(plugin, "vessel_recovery_dragon_podium_z");
+        this.shulkerPeekKey = new NamespacedKey(plugin, "vessel_recovery_shulker_peek");
+        this.shulkerAttachedFaceKey = new NamespacedKey(plugin, "vessel_recovery_shulker_attached_face");
     }
 
     public void save(Mob mob, PossessionOrigin origin, VesselState state) {
@@ -102,6 +118,30 @@ public final class VesselRecoveryStore {
             } else {
                 data.remove(spellcasterSpellKey);
             }
+            if (state.dragonPhase() != null) {
+                data.set(dragonPhaseKey, PersistentDataType.STRING, state.dragonPhase().name());
+            } else {
+                data.remove(dragonPhaseKey);
+            }
+            if (state.dragonPodium() != null) {
+                data.set(dragonPodiumXKey, PersistentDataType.DOUBLE, state.dragonPodium().getX());
+                data.set(dragonPodiumYKey, PersistentDataType.DOUBLE, state.dragonPodium().getY());
+                data.set(dragonPodiumZKey, PersistentDataType.DOUBLE, state.dragonPodium().getZ());
+            } else {
+                data.remove(dragonPodiumXKey);
+                data.remove(dragonPodiumYKey);
+                data.remove(dragonPodiumZKey);
+            }
+            if (state.shulkerPeek() != null) {
+                data.set(shulkerPeekKey, PersistentDataType.FLOAT, state.shulkerPeek());
+            } else {
+                data.remove(shulkerPeekKey);
+            }
+            if (state.shulkerAttachedFace() != null) {
+                data.set(shulkerAttachedFaceKey, PersistentDataType.STRING, state.shulkerAttachedFace().name());
+            } else {
+                data.remove(shulkerAttachedFaceKey);
+            }
             data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
         } catch (RuntimeException ex) {
             index.forget(vesselId);
@@ -133,7 +173,9 @@ public final class VesselRecoveryStore {
             return true;
         }
 
-        mob.getPathfinder().stopPathfinding();
+        if (!(mob instanceof EnderDragon)) {
+            mob.getPathfinder().stopPathfinding();
+        }
         mob.setTarget(null);
         mob.setJumping(false);
         mob.setAI(readBool(data, aiKey, true));
@@ -199,6 +241,42 @@ public final class VesselRecoveryStore {
                 }
             }
         }
+        if (mob instanceof EnderDragon dragon) {
+            String phaseName = data.get(dragonPhaseKey, PersistentDataType.STRING);
+            Double podiumX = data.get(dragonPodiumXKey, PersistentDataType.DOUBLE);
+            Double podiumY = data.get(dragonPodiumYKey, PersistentDataType.DOUBLE);
+            Double podiumZ = data.get(dragonPodiumZKey, PersistentDataType.DOUBLE);
+            if (podiumX != null && podiumY != null && podiumZ != null) {
+                dragon.setPodium(new Location(dragon.getWorld(), podiumX, podiumY, podiumZ));
+            }
+            if (PossessionOrigin.CREATED.name().equals(origin) && !removeOrphanedCreated) {
+                dragon.setVelocity(new org.bukkit.util.Vector());
+                dragon.setPodium(dragon.getLocation());
+                dragon.setPhase(EnderDragon.Phase.HOVER);
+            } else if (phaseName != null) {
+                try {
+                    EnderDragon.Phase phase = EnderDragon.Phase.valueOf(phaseName);
+                    if (phase != EnderDragon.Phase.DYING) {
+                        dragon.setPhase(phase);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    dragon.setPhase(EnderDragon.Phase.HOVER);
+                }
+            }
+        }
+        if (mob instanceof Shulker shulker) {
+            Float peek = data.get(shulkerPeekKey, PersistentDataType.FLOAT);
+            if (peek != null) {
+                shulker.setPeek(Math.max(0.0f, Math.min(1.0f, peek)));
+            }
+            String faceName = data.get(shulkerAttachedFaceKey, PersistentDataType.STRING);
+            if (faceName != null) {
+                try {
+                    shulker.setAttachedFace(BlockFace.valueOf(faceName));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
         if (mob instanceof Guardian guardian) {
             guardian.setLaser(false);
         }
@@ -229,6 +307,12 @@ public final class VesselRecoveryStore {
         data.remove(ravagerStunnedTicksKey);
         data.remove(ravagerRoarTicksKey);
         data.remove(spellcasterSpellKey);
+        data.remove(dragonPhaseKey);
+        data.remove(dragonPodiumXKey);
+        data.remove(dragonPodiumYKey);
+        data.remove(dragonPodiumZKey);
+        data.remove(shulkerPeekKey);
+        data.remove(shulkerAttachedFaceKey);
         index.forget(vesselId);
     }
 

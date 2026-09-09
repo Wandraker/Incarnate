@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0
+
+Complex Bodies foundation.
+
+- Ender Dragon and Shulker are no longer hard-excluded. Both now have dedicated controllers instead of falling through to generic ground movement.
+- Added a dedicated Ender Dragon flight controller. While controlled, the dragon is held in native `HOVER` phase to suppress its vanilla podium/portal autopilot, while Incarnate applies 3D input-driven movement and keeps gravity disabled.
+- Ender Dragon `phase` and `podium` are captured before possession, restored for existing dragons, and persisted through interrupted-session recovery.
+- A created Ender Dragon that is intentionally retained instead of removed is left in safe `HOVER` with its podium moved to its current location, preventing an Incarnate-created body from taking off toward the default podium after release/recovery.
+- Added Ender Dragon primary fire using a real `DragonFireball` launched by the dragon body.
+- Added a dedicated Shulker surface-crawl controller. Movement advances cell-by-cell along the current attachment surface, fails closed outside the current Folia region, and supports vertical wall crawling with jump/sneak.
+- Added Shulker primary fire using a real homing `ShulkerBullet` with the possessed Shulker as projectile source and the aimed living entity as target.
+- Shulker `peek` and `attachedFace` state are now captured, restored and persisted through interrupted-session recovery.
+- Removed the built-in Dragon/Shulker hard deny and changed the default `excluded-types` list to empty. Server owners can still exclude either mob explicitly.
+- Bumped gameplay config schema to 2 and fixed the migration engine so `config-version` actually advances after a migration.
+- Schema 1 migration removes the old Dragon/Shulker exclusion only when the list is still exactly the legacy default; customized exclusion lists remain untouched.
+- Added English/Russian HUD labels and configuration for Dragon movement, Dragon fireball, Shulker crawl and Shulker bullets.
+- This is a CI/smoke-test candidate until live gameplay verifies Dragon movement/camera behavior and Shulker attachment movement on a real client.
+
 ## 0.4.0
 
 Mob Identity & Control Update.

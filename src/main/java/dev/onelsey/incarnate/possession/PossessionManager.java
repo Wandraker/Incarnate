@@ -632,9 +632,7 @@ public final class PossessionManager {
                 vesselRecovery.clear(vessel);
                 vessel.remove();
             } else if (vessel.isValid()) {
-                if (!vessel.isDead()) {
-                    session.vesselState().restore(vessel);
-                }
+                restoreVesselAfterSession(session, vessel);
                 vesselRecovery.clear(vessel);
             }
 
@@ -760,9 +758,7 @@ public final class PossessionManager {
                 vesselRecovery.clear(vessel);
                 vessel.remove();
             } else if (vessel.isValid()) {
-                if (!vessel.isDead()) {
-                    session.vesselState().restore(vessel);
-                }
+                restoreVesselAfterSession(session, vessel);
                 vesselRecovery.clear(vessel);
             }
         }, null);
@@ -791,9 +787,7 @@ public final class PossessionManager {
                 vesselRecovery.clear(vessel);
                 vessel.remove();
             } else if (vessel.isValid()) {
-                if (!vessel.isDead()) {
-                    session.vesselState().restore(vessel);
-                }
+                restoreVesselAfterSession(session, vessel);
                 vesselRecovery.clear(vessel);
             }
         }, null);
@@ -911,9 +905,7 @@ public final class PossessionManager {
                     vesselRecovery.clear(vessel);
                     vessel.remove();
                 } else {
-                    if (!vessel.isDead()) {
-                        session.vesselState().restore(vessel);
-                    }
+                    restoreVesselAfterSession(session, vessel);
                     vesselRecovery.clear(vessel);
                 }
             }
@@ -972,6 +964,17 @@ public final class PossessionManager {
         if (origin == PossessionOrigin.CREATED && vessel.isValid()) {
             vesselRecovery.clear(vessel);
             vessel.remove();
+        }
+    }
+
+    private static void restoreVesselAfterSession(PossessionSession session, Mob vessel) {
+        if (vessel.isDead()) {
+            return;
+        }
+        if (session.origin() == PossessionOrigin.CREATED) {
+            session.vesselState().restoreRetainedCreated(vessel);
+        } else {
+            session.vesselState().restore(vessel);
         }
     }
 
