@@ -2,6 +2,7 @@ package dev.onelsey.incarnate.possession;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Bat;
+import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
@@ -16,12 +17,14 @@ public record VesselState(
     boolean gravity,
     LivingEntity target,
     Boolean sitting,
+    Boolean camelDashing,
     Boolean batAwake,
     Boolean creeperIgnited,
     Integer creeperFuseTicks
 ) {
     public static VesselState capture(Mob mob) {
         Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
+        Boolean camelDashing = mob instanceof Camel camel ? camel.isDashing() : null;
         Boolean batAwake = mob instanceof Bat bat ? bat.isAwake() : null;
         Boolean creeperIgnited = mob instanceof Creeper creeper ? creeper.isIgnited() : null;
         Integer creeperFuseTicks = mob instanceof Creeper creeper ? creeper.getFuseTicks() : null;
@@ -35,6 +38,7 @@ public record VesselState(
             mob.hasGravity(),
             mob.getTarget(),
             sitting,
+            camelDashing,
             batAwake,
             creeperIgnited,
             creeperFuseTicks
@@ -53,6 +57,9 @@ public record VesselState(
 
         if (mob instanceof Sittable sittable) {
             sittable.setSitting(false);
+        }
+        if (mob instanceof Camel camel) {
+            camel.setDashing(false);
         }
         if (mob instanceof Bat bat) {
             bat.setAwake(true);
@@ -76,6 +83,9 @@ public record VesselState(
         }
         if (mob instanceof Sittable sittable && sitting != null) {
             sittable.setSitting(sitting);
+        }
+        if (mob instanceof Camel camel && camelDashing != null) {
+            camel.setDashing(camelDashing);
         }
         if (mob instanceof Bat bat && batAwake != null) {
             bat.setAwake(batAwake);
