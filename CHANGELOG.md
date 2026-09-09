@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0
+
+Free-Look Camera & Mob Polish Update.
+
+- Replaced the default direct spectator-target camera with a mounted free-look camera transport: the hidden spectator Player remains its own camera while riding the real Mob body, allowing normal yaw/pitch input to drive vessel look direction.
+- Added configurable camera transport under `camera.mode`, with `MOUNTED` as the default and the previous `SPECTATOR_TARGET` transport available as a compatibility fallback.
+- Mounted camera acquisition teleports the hidden controller to the vessel through the Player scheduler, retries region-safe mounting through the vessel EntityScheduler, and fails back or releases safely when mounting cannot complete.
+- Added guarded dismount handling so ordinary sneak/dismount input cannot silently detach an active mounted controller.
+- Release, quit, death and plugin-disable paths now explicitly detach mounted controllers before restoring Player state or teleporting.
+- The control loop now centrally refreshes the last known vessel location every successful tick, improving emergency/recovery exit positioning even for controller families that do not update it themselves.
+- Added a native Ravager secondary roar using the real Paper/vanilla roar state (`setRoarTicks(11)`) rather than synthetic damage/effects.
+- Ravager attack, stun and roar tick state is preserved across normal release and persisted for interrupted-session recovery.
+- Existing 0.2.0 native abilities, default-deny permissions, per-mob permissions, concealment and crash recovery remain intact.
+- The mounted free-look transport still requires live client validation across representative mobs and server implementations before it is treated as gameplay-final.
+
 ## 0.2.0
 
 Native Abilities Update.
