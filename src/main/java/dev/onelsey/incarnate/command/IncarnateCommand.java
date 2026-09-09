@@ -1,5 +1,6 @@
 package dev.onelsey.incarnate.command;
 
+import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.permission.IncarnatePermissions;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionOrigin;
@@ -23,25 +24,28 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public final class IncarnateCommand implements CommandExecutor, TabCompleter {
     private final PossessionManager possessions;
+    private final MessageService messages;
     private final double inspectDistance;
 
-    public IncarnateCommand(PossessionManager possessions, double inspectDistance) {
+    public IncarnateCommand(PossessionManager possessions, MessageService messages, double inspectDistance) {
         this.possessions = possessions;
+        this.messages = messages;
         this.inspectDistance = Math.max(1.0, inspectDistance);
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("This command is player-only.");
+            messages.send(sender, "player-only");
             return true;
         }
 
         if (args.length != 1) {
-            player.sendMessage(Component.text("[Incarnate] Usage: /incarnate <mob|primary|secondary|inspect>"));
+            messages.send(player, "usage-incarnate");
             return true;
         }
 
@@ -60,11 +64,11 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
         }
 
         if (!player.hasPermission(IncarnatePermissions.CREATE)) {
-            player.sendMessage(Component.text("[Incarnate] You do not have permission to create a vessel."));
+            messages.send(player, "permission-create");
             return true;
         }
         if (possessions.isPossessing(player)) {
-            player.sendMessage(Component.text("[Incarnate] Release your current vessel first."));
+            messages.send(player, "release-current-first");
             return true;
         }
 
@@ -72,16 +76,17 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
         try {
             type = EntityType.valueOf(args[0].toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            player.sendMessage(Component.text("[Incarnate] Unknown entity type: " + args[0]));
+            messages.send(player, "entity-unknown", Map.of("entity", Component.text(args[0])));
             return true;
         }
 
+        Component entityName = Component.text(type.name().toLowerCase(Locale.ROOT));
         if (!possessions.canCreate(type)) {
-            player.sendMessage(Component.text("[Incarnate] " + type + " cannot be used as a created vessel in this build."));
+            messages.send(player, "entity-created-unsupported", Map.of("entity", entityName));
             return true;
         }
         if (!IncarnatePermissions.canUseMob(player, type)) {
-            player.sendMessage(Component.text("[Incarnate] You do not have access to the " + type + " vessel."));
+            messages.send(player, "mob-access-denied", Map.of("entity", entityName));
             return true;
         }
 
@@ -90,13 +95,13 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
         try {
             entity = player.getWorld().spawnEntity(spawn, type);
         } catch (RuntimeException ex) {
-            player.sendMessage(Component.text("[Incarnate] Failed to create that vessel type."));
+            messages.send(player, "create-failed");
             return true;
         }
 
         if (!(entity instanceof Mob mob)) {
             entity.remove();
-            player.sendMessage(Component.text("[Incarnate] Internal type check rejected that vessel."));
+            messages.send(player, "internal-type-rejected");
             return true;
         }
 
@@ -106,7 +111,7 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
 
     private void inspect(Player player) {
         if (!player.hasPermission(IncarnatePermissions.INSPECT)) {
-            player.sendMessage(Component.text("[Incarnate] You do not have permission to inspect vessels."));
+            messages.send(player, "permission-inspect");
             return;
         }
 
@@ -121,22 +126,25 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
         );
         Entity entity = hit == null ? null : hit.getHitEntity();
         if (!(entity instanceof Mob mob)) {
-            player.sendMessage(Component.text("[Incarnate] Look at a mob within " + inspectDistance + " blocks."));
+            messages.send(player, "inspect-look", Map.of(
+                "distance", Component.text(String.format(Locale.ROOT, "%.1f", inspectDistance))
+            ));
             return;
         }
 
         PossessionSession session = possessions.session(mob);
         if (session == null || !session.isActive()) {
-            player.sendMessage(Component.text("[Incarnate] That mob is not currently controlled by Incarnate."));
+            messages.send(player, "inspect-not-controlled");
             return;
         }
 
-        player.sendMessage(Component.text(
-            "[Incarnate] " + mob.getType()
-                + " vessel=" + session.vesselId()
-                + " controller=" + session.playerName()
-                + " (" + session.playerId() + ")"
-                + " origin=" + session.origin().name().toLowerCase(Locale.ROOT)
+        String originKey = "origin." + session.origin().name().toLowerCase(Locale.ROOT);
+        messages.send(player, "inspect-result", Map.of(
+            "mob", Component.text(mob.getType().name().toLowerCase(Locale.ROOT)),
+            "vessel", Component.text(session.vesselId().toString()),
+            "controller", Component.text(session.playerName()),
+            "controller_uuid", Component.text(session.playerId().toString()),
+            "origin", messages.render(player, originKey)
         ));
     }
 
