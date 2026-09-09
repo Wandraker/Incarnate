@@ -16,18 +16,22 @@ First source release of Incarnate.
 - Native `MOVEMENT_SPEED` / `JUMP_STRENGTH` used for ordinary ground bodies.
 - Native `FLYING_SPEED` used for flying bodies when present, with configurable clamps and fallback speed.
 - Rabbit and dry-land Frog movement changed to hopping behavior; Frog remains aquatic in water.
+- Burst movement uses a short control lock so ability impulses are not overwritten on the next control tick.
 - Existing Mob AI/awareness/persistence/despawn/aggressive/gravity and special state restored on release.
-- Safe restoration of a pre-possession Mob target when the target remains alive and belongs to the same Folia-owned region.
-- PDC recovery records for interrupted Player and vessel sessions.
+- Safe restoration of a pre-possession Mob target when the target remains alive and belongs to the same Folia-owned region; ownership is checked before live target state is read.
+- Sittable Mob pose state, Bat awake state, Camel dash state and Creeper ignition/fuse progress are preserved and recovered.
+- PDC recovery records for interrupted Player and vessel sessions use commit markers written last to avoid accepting partial snapshots.
 - Durable vessel UUID recovery index so already-loaded bodies can be recovered after restart/reload.
 - Player recovery stores world/location/rotation and remains pending if the saved world is temporarily unavailable.
 - Orphan created-vessel cleanup on entity load/startup recovery.
 - Fixed first-use primary cooldown overflow from development builds.
 - Separate secondary ability cooldown channel.
 - Real-body projectile abilities for skeleton family, Blaze, Ghast, Wither, Snow Golem, Llama and Breeze.
+- Native Paper `RangedEntity` attacks for crossbow Pillager/Piglin, trident Drowned, bow Illusioner and Witch when a living target is under the vessel crosshair.
 - Real Creeper fuse control.
 - Enderman secondary directional teleport with collision/safe-landing checks.
-- Spider / Cave Spider secondary pounce.
+- Spider / Cave Spider secondary pounce with preserved physical impulse.
+- Camel secondary dash using the real dashing state plus a physical forward impulse.
 - Generic real-Mob melee fallback through `LivingEntity.attack` for bodies without a dedicated primary projectile.
 - Damage knockback is preserved instead of being immediately erased by movement input/damping.
 - Safer release/recovery state machine prevents a new possession from racing an unfinished previous release.
