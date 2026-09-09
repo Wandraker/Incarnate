@@ -5,6 +5,8 @@ api-version: '26.2'
 authors: [Onelsey]
 description: True mob incarnation and possession using real server entities.
 folia-supported: true
+softdepend:
+  - Elysium_Private_Tag
 commands:
   incarnate:
     description: Create a real mob body, trigger abilities, or inspect a controlled vessel.
