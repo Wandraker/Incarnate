@@ -5,6 +5,7 @@ import org.bukkit.entity.Bat;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Sittable;
 
 public record VesselState(
     boolean aware,
@@ -14,11 +15,13 @@ public record VesselState(
     boolean aggressive,
     boolean gravity,
     LivingEntity target,
+    Boolean sitting,
     Boolean batAwake,
     Boolean creeperIgnited,
     Integer creeperFuseTicks
 ) {
     public static VesselState capture(Mob mob) {
+        Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
         Boolean batAwake = mob instanceof Bat bat ? bat.isAwake() : null;
         Boolean creeperIgnited = mob instanceof Creeper creeper ? creeper.isIgnited() : null;
         Integer creeperFuseTicks = mob instanceof Creeper creeper ? creeper.getFuseTicks() : null;
@@ -31,6 +34,7 @@ public record VesselState(
             mob.isAggressive(),
             mob.hasGravity(),
             mob.getTarget(),
+            sitting,
             batAwake,
             creeperIgnited,
             creeperFuseTicks
@@ -47,6 +51,9 @@ public record VesselState(
         mob.setPersistent(true);
         mob.setRemoveWhenFarAway(false);
 
+        if (mob instanceof Sittable sittable) {
+            sittable.setSitting(false);
+        }
         if (mob instanceof Bat bat) {
             bat.setAwake(true);
             bat.setTargetLocation(null);
@@ -67,12 +74,13 @@ public record VesselState(
         if (target != null && target.isValid() && !target.isDead() && Bukkit.isOwnedByCurrentRegion(target)) {
             mob.setTarget(target);
         }
-
+        if (mob instanceof Sittable sittable && sitting != null) {
+            sittable.setSitting(sitting);
+        }
         if (mob instanceof Bat bat && batAwake != null) {
             bat.setAwake(batAwake);
             bat.setTargetLocation(null);
         }
-
         if (mob instanceof Creeper creeper && creeperIgnited != null && creeperFuseTicks != null) {
             restoreCreeper(creeper, creeperIgnited, creeperFuseTicks);
         }
