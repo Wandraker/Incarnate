@@ -3,6 +3,7 @@ package dev.onelsey.incarnate.command;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionOrigin;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -40,7 +41,9 @@ public final class PossessCommand implements CommandExecutor {
             FluidCollisionMode.NEVER,
             true,
             0.35,
-            entity -> entity instanceof Mob && entity != player
+            entity -> Bukkit.isOwnedByCurrentRegion(entity)
+                && entity instanceof Mob
+                && entity != player
         );
 
         Entity entity = hit == null ? null : hit.getHitEntity();
