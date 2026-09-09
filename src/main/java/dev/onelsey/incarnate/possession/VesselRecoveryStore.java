@@ -8,6 +8,7 @@ import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Guardian;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.PufferFish;
+import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Sittable;
 import org.bukkit.entity.Vex;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -33,6 +34,9 @@ public final class VesselRecoveryStore {
     private final NamespacedKey creeperFuseTicksKey;
     private final NamespacedKey pufferFishPuffStateKey;
     private final NamespacedKey vexChargingKey;
+    private final NamespacedKey ravagerAttackTicksKey;
+    private final NamespacedKey ravagerStunnedTicksKey;
+    private final NamespacedKey ravagerRoarTicksKey;
 
     public VesselRecoveryStore(IncarnatePlugin plugin) {
         this.index = new VesselRecoveryIndex(plugin);
@@ -51,6 +55,9 @@ public final class VesselRecoveryStore {
         this.creeperFuseTicksKey = new NamespacedKey(plugin, "vessel_recovery_creeper_fuse_ticks");
         this.pufferFishPuffStateKey = new NamespacedKey(plugin, "vessel_recovery_pufferfish_puff_state");
         this.vexChargingKey = new NamespacedKey(plugin, "vessel_recovery_vex_charging");
+        this.ravagerAttackTicksKey = new NamespacedKey(plugin, "vessel_recovery_ravager_attack_ticks");
+        this.ravagerStunnedTicksKey = new NamespacedKey(plugin, "vessel_recovery_ravager_stunned_ticks");
+        this.ravagerRoarTicksKey = new NamespacedKey(plugin, "vessel_recovery_ravager_roar_ticks");
     }
 
     public void save(Mob mob, PossessionOrigin origin, VesselState state) {
@@ -84,6 +91,9 @@ public final class VesselRecoveryStore {
                 data.remove(pufferFishPuffStateKey);
             }
             setNullableBool(data, vexChargingKey, state.vexCharging());
+            setNullableInt(data, ravagerAttackTicksKey, state.ravagerAttackTicks());
+            setNullableInt(data, ravagerStunnedTicksKey, state.ravagerStunnedTicks());
+            setNullableInt(data, ravagerRoarTicksKey, state.ravagerRoarTicks());
             data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
         } catch (RuntimeException ex) {
             index.forget(vesselId);
@@ -163,6 +173,14 @@ public final class VesselRecoveryStore {
                 vex.setCharging(charging);
             }
         }
+        if (mob instanceof Ravager ravager) {
+            Integer attackTicks = data.get(ravagerAttackTicksKey, PersistentDataType.INTEGER);
+            Integer stunnedTicks = data.get(ravagerStunnedTicksKey, PersistentDataType.INTEGER);
+            Integer roarTicks = data.get(ravagerRoarTicksKey, PersistentDataType.INTEGER);
+            if (attackTicks != null) ravager.setAttackTicks(attackTicks);
+            if (stunnedTicks != null) ravager.setStunnedTicks(stunnedTicks);
+            if (roarTicks != null) ravager.setRoarTicks(roarTicks);
+        }
         if (mob instanceof Guardian guardian) {
             guardian.setLaser(false);
         }
@@ -189,6 +207,9 @@ public final class VesselRecoveryStore {
         data.remove(creeperFuseTicksKey);
         data.remove(pufferFishPuffStateKey);
         data.remove(vexChargingKey);
+        data.remove(ravagerAttackTicksKey);
+        data.remove(ravagerStunnedTicksKey);
+        data.remove(ravagerRoarTicksKey);
         index.forget(vesselId);
     }
 
@@ -201,6 +222,14 @@ public final class VesselRecoveryStore {
             data.remove(key);
         } else {
             data.set(key, PersistentDataType.BYTE, bool(value));
+        }
+    }
+
+    private static void setNullableInt(PersistentDataContainer data, NamespacedKey key, Integer value) {
+        if (value == null) {
+            data.remove(key);
+        } else {
+            data.set(key, PersistentDataType.INTEGER, value);
         }
     }
 

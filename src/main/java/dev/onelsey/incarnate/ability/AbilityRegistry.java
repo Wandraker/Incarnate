@@ -29,6 +29,7 @@ import org.bukkit.entity.Piglin;
 import org.bukkit.entity.Pillager;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.PufferFish;
+import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.SmallFireball;
 import org.bukkit.entity.Snowball;
@@ -87,6 +88,9 @@ public final class AbilityRegistry {
     private final int vexChargeDurationTicks;
     private final int vexChargeCooldownTicks;
     private final int vexChargeLockTicks;
+    private final boolean ravagerRoarEnabled;
+    private final int ravagerRoarCooldownTicks;
+    private final int ravagerRoarLockTicks;
 
     public AbilityRegistry(FileConfiguration config) {
         this.skeletonEnabled = config.getBoolean("abilities.skeleton.enabled", true);
@@ -131,6 +135,9 @@ public final class AbilityRegistry {
         this.vexChargeDurationTicks = Math.max(1, config.getInt("abilities.vex-charge.duration-ticks", 8));
         this.vexChargeCooldownTicks = Math.max(1, config.getInt("abilities.vex-charge.cooldown-ticks", 24));
         this.vexChargeLockTicks = Math.max(1, config.getInt("abilities.vex-charge.movement-lock-ticks", 8));
+        this.ravagerRoarEnabled = config.getBoolean("abilities.ravager-roar.enabled", true);
+        this.ravagerRoarCooldownTicks = Math.max(1, config.getInt("abilities.ravager-roar.cooldown-ticks", 80));
+        this.ravagerRoarLockTicks = Math.max(1, config.getInt("abilities.ravager-roar.movement-lock-ticks", 12));
     }
 
     public boolean triggerPrimary(PossessionSession session) {
@@ -183,6 +190,9 @@ public final class AbilityRegistry {
         if (vessel instanceof Camel camel && camelDashEnabled) {
             return dashCamel(session, camel);
         }
+        if (vessel instanceof Ravager ravager && ravagerRoarEnabled) {
+            return roarRavager(session, ravager);
+        }
         return false;
     }
 
@@ -228,6 +238,7 @@ public final class AbilityRegistry {
         if (vessel instanceof Enderman && endermanTeleportEnabled) return "teleport";
         if (vessel instanceof Spider && spiderPounceEnabled) return "pounce";
         if (vessel instanceof Camel && camelDashEnabled) return "dash";
+        if (vessel instanceof Ravager && ravagerRoarEnabled) return "roar";
         return "none";
     }
 
@@ -482,6 +493,17 @@ public final class AbilityRegistry {
         camel.setDashing(true);
         session.lockMovementControl(camelDashLockTicks);
         camel.setVelocity(horizontal);
+        return true;
+    }
+
+    private boolean roarRavager(PossessionSession session, Ravager ravager) {
+        if (!session.acquireSecondaryCooldown(ravagerRoarCooldownTicks)) {
+            return false;
+        }
+        ravager.setStunnedTicks(-1);
+        ravager.setAttackTicks(-1);
+        ravager.setRoarTicks(11);
+        session.lockMovementControl(ravagerRoarLockTicks);
         return true;
     }
 

@@ -8,6 +8,7 @@ import org.bukkit.entity.Guardian;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.PufferFish;
+import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Sittable;
 import org.bukkit.entity.Vex;
 
@@ -27,7 +28,10 @@ public record VesselState(
     Boolean guardianLaserActive,
     Integer guardianLaserTicks,
     Integer pufferFishPuffState,
-    Boolean vexCharging
+    Boolean vexCharging,
+    Integer ravagerAttackTicks,
+    Integer ravagerStunnedTicks,
+    Integer ravagerRoarTicks
 ) {
     public static VesselState capture(Mob mob) {
         Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
@@ -39,6 +43,9 @@ public record VesselState(
         Integer guardianLaserTicks = mob instanceof Guardian guardian ? guardian.getLaserTicks() : null;
         Integer pufferFishPuffState = mob instanceof PufferFish pufferFish ? pufferFish.getPuffState() : null;
         Boolean vexCharging = mob instanceof Vex vex ? vex.isCharging() : null;
+        Integer ravagerAttackTicks = mob instanceof Ravager ravager ? ravager.getAttackTicks() : null;
+        Integer ravagerStunnedTicks = mob instanceof Ravager ravager ? ravager.getStunnedTicks() : null;
+        Integer ravagerRoarTicks = mob instanceof Ravager ravager ? ravager.getRoarTicks() : null;
 
         return new VesselState(
             mob.isAware(),
@@ -56,7 +63,10 @@ public record VesselState(
             guardianLaserActive,
             guardianLaserTicks,
             pufferFishPuffState,
-            vexCharging
+            vexCharging,
+            ravagerAttackTicks,
+            ravagerStunnedTicks,
+            ravagerRoarTicks
         );
     }
 
@@ -85,6 +95,11 @@ public record VesselState(
         }
         if (mob instanceof Vex vex) {
             vex.setCharging(false);
+        }
+        if (mob instanceof Ravager ravager) {
+            ravager.setAttackTicks(-1);
+            ravager.setStunnedTicks(-1);
+            ravager.setRoarTicks(-1);
         }
     }
 
@@ -122,6 +137,11 @@ public record VesselState(
         }
         if (mob instanceof Vex vex && vexCharging != null) {
             vex.setCharging(vexCharging);
+        }
+        if (mob instanceof Ravager ravager && ravagerAttackTicks != null && ravagerStunnedTicks != null && ravagerRoarTicks != null) {
+            ravager.setAttackTicks(ravagerAttackTicks);
+            ravager.setStunnedTicks(ravagerStunnedTicks);
+            ravager.setRoarTicks(ravagerRoarTicks);
         }
         if (mob instanceof Guardian guardian) {
             guardian.setLaser(false);
