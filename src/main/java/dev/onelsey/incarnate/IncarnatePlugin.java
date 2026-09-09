@@ -44,6 +44,7 @@ public final class IncarnatePlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new SessionListener(this, possessions), this);
         possessions.recoverIndexedVessels();
         possessions.recoverAlreadyOnlinePlayers();
+        visibility.recoverStaleTabEntries();
         getLogger().info("Incarnate 0.1.0 enabled for Minecraft 26.2+ (Paper/Purpur/Leaf/Folia).");
     }
 
