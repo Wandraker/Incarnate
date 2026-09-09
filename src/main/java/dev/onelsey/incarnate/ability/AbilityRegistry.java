@@ -7,6 +7,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.AbstractSkeleton;
 import org.bukkit.entity.Arrow;
@@ -17,6 +19,8 @@ import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Drowned;
 import org.bukkit.entity.Enderman;
+import org.bukkit.entity.Evoker;
+import org.bukkit.entity.EvokerFangs;
 import org.bukkit.entity.Ghast;
 import org.bukkit.entity.Guardian;
 import org.bukkit.entity.Illusioner;
@@ -35,6 +39,7 @@ import org.bukkit.entity.SmallFireball;
 import org.bukkit.entity.Snowball;
 import org.bukkit.entity.Snowman;
 import org.bukkit.entity.Spider;
+import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.TraderLlama;
 import org.bukkit.entity.Vex;
 import org.bukkit.entity.Witch;
@@ -44,6 +49,9 @@ import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class AbilityRegistry {
     private final boolean skeletonEnabled;
@@ -91,6 +99,13 @@ public final class AbilityRegistry {
     private final boolean ravagerRoarEnabled;
     private final int ravagerRoarCooldownTicks;
     private final int ravagerRoarLockTicks;
+    private final boolean evokerFangsEnabled;
+    private final int evokerFangsCount;
+    private final double evokerFangsSpacing;
+    private final int evokerFangsCooldownTicks;
+    private final int evokerFangsCastTicks;
+    private final int evokerFangsAttackDelayStep;
+    private final int evokerFangsGroundSearchBlocks;
 
     public AbilityRegistry(FileConfiguration config) {
         this.skeletonEnabled = config.getBoolean("abilities.skeleton.enabled", true);
@@ -138,6 +153,13 @@ public final class AbilityRegistry {
         this.ravagerRoarEnabled = config.getBoolean("abilities.ravager-roar.enabled", true);
         this.ravagerRoarCooldownTicks = Math.max(1, config.getInt("abilities.ravager-roar.cooldown-ticks", 80));
         this.ravagerRoarLockTicks = Math.max(1, config.getInt("abilities.ravager-roar.movement-lock-ticks", 12));
+        this.evokerFangsEnabled = config.getBoolean("abilities.evoker-fangs.enabled", true);
+        this.evokerFangsCount = Math.max(1, Math.min(16, config.getInt("abilities.evoker-fangs.count", 8)));
+        this.evokerFangsSpacing = Math.max(0.25, config.getDouble("abilities.evoker-fangs.spacing", 1.25));
+        this.evokerFangsCooldownTicks = Math.max(1, config.getInt("abilities.evoker-fangs.cooldown-ticks", 50));
+        this.evokerFangsCastTicks = Math.max(1, config.getInt("abilities.evoker-fangs.cast-ticks", 20));
+        this.evokerFangsAttackDelayStep = Math.max(0, config.getInt("abilities.evoker-fangs.attack-delay-step", 2));
+        this.evokerFangsGroundSearchBlocks = Math.max(1, Math.min(8, config.getInt("abilities.evoker-fangs.ground-search-blocks", 3)));
     }
 
     public boolean triggerPrimary(PossessionSession session) {
@@ -181,6 +203,9 @@ public final class AbilityRegistry {
         if (vessel instanceof Vex vex && vexChargeEnabled) {
             return chargeVex(session, vex);
         }
+        if (vessel instanceof Evoker evoker && evokerFangsEnabled) {
+            return castEvokerFangs(session, evoker);
+        }
         if (vessel instanceof Enderman enderman && endermanTeleportEnabled) {
             return teleportEnderman(session, enderman);
         }
@@ -207,6 +232,9 @@ public final class AbilityRegistry {
         if (vessel instanceof Vex vex) {
             tickVexCharge(session, vex);
         }
+        if (vessel instanceof Evoker evoker) {
+            tickEvokerCast(session, evoker);
+        }
     }
 
     public void abortActive(PossessionSession session) {
@@ -220,6 +248,12 @@ public final class AbilityRegistry {
         if (vessel instanceof Vex vex && session.vexChargeActive()) {
             vex.setCharging(false);
             session.clearVexCharge();
+        }
+        if (vessel instanceof Evoker evoker && session.evokerCastTracked()) {
+            if (evoker.getSpell() == Spellcaster.Spell.FANGS) {
+                evoker.setSpell(Spellcaster.Spell.NONE);
+            }
+            session.clearEvokerCast();
         }
     }
 
@@ -235,6 +269,7 @@ public final class AbilityRegistry {
     public String secondaryLabel(Mob vessel) {
         if (vessel instanceof PufferFish && pufferFishPuffEnabled) return "puff";
         if (vessel instanceof Vex && vexChargeEnabled) return "charge";
+        if (vessel instanceof Evoker && evokerFangsEnabled) return "fangs";
         if (vessel instanceof Enderman && endermanTeleportEnabled) return "teleport";
         if (vessel instanceof Spider && spiderPounceEnabled) return "pounce";
         if (vessel instanceof Camel && camelDashEnabled) return "dash";
@@ -344,6 +379,86 @@ public final class AbilityRegistry {
             vex.setCharging(false);
         }
         session.clearVexCharge();
+    }
+
+    private boolean castEvokerFangs(PossessionSession session, Evoker evoker) {
+        if (session.evokerCastTracked()) {
+            return false;
+        }
+
+        Vector horizontal = direction(session.view());
+        horizontal.setY(0.0);
+        if (horizontal.lengthSquared() < 1.0E-6) {
+            return false;
+        }
+        horizontal.normalize();
+
+        List<Location> spawnLocations = new ArrayList<>();
+        Location origin = evoker.getLocation();
+        for (int i = 1; i <= evokerFangsCount; i++) {
+            Location sample = origin.clone().add(horizontal.clone().multiply(evokerFangsSpacing * i));
+            if (!Bukkit.isOwnedByCurrentRegion(sample)) {
+                break;
+            }
+            Location fangLocation = findFangSpawnLocation(sample);
+            if (fangLocation != null) {
+                spawnLocations.add(fangLocation);
+            }
+        }
+
+        if (spawnLocations.isEmpty() || !session.acquireSecondaryCooldown(evokerFangsCooldownTicks)) {
+            return false;
+        }
+
+        evoker.setSpell(Spellcaster.Spell.FANGS);
+        evoker.getPathfinder().stopPathfinding();
+        evoker.setVelocity(new Vector());
+        session.startEvokerCast(evokerFangsCastTicks);
+        session.lockMovementControl(evokerFangsCastTicks);
+
+        int delay = 1;
+        for (Location location : spawnLocations) {
+            int attackDelay = delay;
+            evoker.getWorld().spawn(location, EvokerFangs.class, fangs -> {
+                fangs.setOwner(evoker);
+                fangs.setAttackDelay(attackDelay);
+            });
+            delay += evokerFangsAttackDelayStep;
+        }
+        return true;
+    }
+
+    private void tickEvokerCast(PossessionSession session, Evoker evoker) {
+        if (!session.evokerCastTracked()) {
+            return;
+        }
+        if (session.evokerCastExpired()) {
+            if (evoker.getSpell() == Spellcaster.Spell.FANGS) {
+                evoker.setSpell(Spellcaster.Spell.NONE);
+            }
+            session.clearEvokerCast();
+            return;
+        }
+        evoker.setSpell(Spellcaster.Spell.FANGS);
+        evoker.getPathfinder().stopPathfinding();
+        evoker.setVelocity(new Vector());
+    }
+
+    private Location findFangSpawnLocation(Location sample) {
+        Location cursor = sample.clone();
+        cursor.setY(sample.getBlockY() + 1.0);
+        for (int step = 0; step <= evokerFangsGroundSearchBlocks; step++) {
+            Location check = cursor.clone().subtract(0.0, step, 0.0);
+            if (!Bukkit.isOwnedByCurrentRegion(check)) {
+                return null;
+            }
+            Block feet = check.getBlock();
+            Block below = feet.getRelative(BlockFace.DOWN);
+            if (feet.isPassable() && below.getType().isSolid()) {
+                return feet.getLocation().add(0.5, 0.05, 0.5);
+            }
+        }
+        return null;
     }
 
     private boolean toggleCreeper(PossessionSession session, Creeper creeper) {
