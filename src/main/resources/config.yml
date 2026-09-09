@@ -6,6 +6,12 @@ release-key:
   shift-swap-offhand: true
   spectator-shift-latch-ms: 650
 
+secondary-key:
+  swap-offhand: true
+
+admin:
+  inspect-distance: 12.0
+
 visibility:
   hide-controller-from-tab: true
 
@@ -75,6 +81,15 @@ abilities:
     range: 3.25
     ray-size: 0.30
     cooldown-ticks: 10
+  enderman-teleport:
+    enabled: true
+    max-distance: 12.0
+    cooldown-ticks: 30
+  spider-pounce:
+    enabled: true
+    horizontal-speed: 0.85
+    vertical-velocity: 0.42
+    cooldown-ticks: 18
 
 excluded-types:
   - ENDER_DRAGON
