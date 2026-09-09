@@ -42,6 +42,14 @@ messages:
   recovered: '<prefix> <success>Recovered from an interrupted possession session.</success>'
   recovery-pending: '<prefix> <warning>Recovery is still pending.</warning> <muted>New possession is blocked for safety.</muted>'
 
+  hud:
+    line: '<primary>❤</primary> <text><health>/<max_health></text> <dark_gray>•</dark_gray> <muted>LMB:</muted> <accent><primary_action></accent> <primary_state> <dark_gray>•</dark_gray> <muted>F:</muted> <secondary><secondary_action></secondary> <secondary_state>'
+    health-only: '<primary>❤</primary> <text><health>/<max_health></text>'
+    abilities-only: '<muted>LMB:</muted> <accent><primary_action></accent> <primary_state> <dark_gray>•</dark_gray> <muted>F:</muted> <secondary><secondary_action></secondary> <secondary_state>'
+    ready: '<success>READY</success>'
+    cooldown: '<warning><seconds>s</warning>'
+    unavailable: '<muted>—</muted>'
+
   camera:
     mounted-free-look: 'mounted free-look'
     legacy-spectator-fallback: 'legacy spectator fallback'
@@ -66,6 +74,7 @@ messages:
     pounce: 'pounce'
     dash: 'dash'
     roar: 'roar'
+    fangs: 'fangs'
 
   origin:
     created: 'created'
