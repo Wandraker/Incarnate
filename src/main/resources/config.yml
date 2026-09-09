@@ -2,6 +2,11 @@ control:
   max-possession-distance: 8.0
   release-at-vessel: true
 
+camera:
+  mode: MOUNTED
+  mount-retries: 8
+  fallback-to-spectator-target: true
+
 release-key:
   shift-swap-offhand: true
   spectator-shift-latch-ms: 650
@@ -120,6 +125,10 @@ abilities:
     duration-ticks: 8
     cooldown-ticks: 24
     movement-lock-ticks: 8
+  ravager-roar:
+    enabled: true
+    cooldown-ticks: 80
+    movement-lock-ticks: 12
 
 excluded-types:
   - ENDER_DRAGON
