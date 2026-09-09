@@ -7,11 +7,18 @@ First source release of Incarnate.
 - True possession of real server Mob entities.
 - `/incarnate <mob>`, `/possess`, `/release`, primary and secondary ability fallback commands.
 - Left-click primary ability, Swap Offhand secondary ability, and Shift + Swap Offhand release path (normally F and Shift+F).
+- Gameplay access is opt-in: `incarnate.use.incarnate` and `incarnate.use.possess` are `default: false`.
+- Added per-mob access nodes in the form `incarnate.mob.<entity_type>` and the explicit `incarnate.mob.*` all-supported-mobs wildcard.
+- Per-mob permission checks apply to both created incarnations and possession of existing mobs and are enforced again in the possession core.
+- `/incarnate` tab completion only exposes mob forms the player is actually allowed to use.
+- `/release` intentionally requires no permission so a permission/rank change cannot trap a player in a vessel or block recovery.
 - Admin-only `/incarnate inspect` with `incarnate.admin.inspect`; controller identity is not exposed visually on the Mob.
 - Spectator-target camera protection and Shift latch.
 - Controller concealment switched to a hide/show tracking pulse plus cancellable Paper tracking events, avoiding a long-lived Incarnate `hidePlayer` layer.
 - Optional per-viewer controller removal from the tab list.
+- Durable per-viewer TAB ownership recovery so hot reload can restore entries removed by the previous Incarnate instance.
 - Folia-oriented split between Player EntityScheduler input sampling and Mob EntityScheduler mutation.
+- Entity ray-trace consumers fail closed on current Folia ownership before reading/acting on hit entities.
 - Ground, flight, aquatic, amphibious, hopping, climbing and cube/slime movement controllers.
 - Native `MOVEMENT_SPEED` / `JUMP_STRENGTH` used for ordinary ground bodies.
 - Native `FLYING_SPEED` used for flying bodies when present, with configurable clamps and fallback speed.
@@ -39,7 +46,7 @@ First source release of Incarnate.
 - Plugin-disable path does not schedule tasks after the JavaPlugin is already disabled.
 - Ender Dragon and Shulker explicitly excluded.
 - Paper API pinned to `26.2.build.121-stable`, Java 25.
-- GitHub CI performs Java 25 compilation and a real Paper 26.2 startup/graceful-shutdown smoke test without publishing the temporary JAR.
+- GitHub CI now gates changes with unit tests, Java 25 compilation and a real Paper 26.2 startup/graceful-shutdown smoke test without publishing the temporary JAR.
 
 ## 0.1.0-dev.2
 
