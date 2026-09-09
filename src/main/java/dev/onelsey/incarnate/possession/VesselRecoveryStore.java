@@ -8,11 +8,13 @@ import org.bukkit.entity.Bat;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Frog;
 import org.bukkit.entity.Guardian;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Shulker;
+import org.bukkit.entity.Sniffer;
 import org.bukkit.entity.Sittable;
 import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.Vex;
@@ -49,6 +51,7 @@ public final class VesselRecoveryStore {
     private final NamespacedKey dragonPodiumZKey;
     private final NamespacedKey shulkerPeekKey;
     private final NamespacedKey shulkerAttachedFaceKey;
+    private final NamespacedKey snifferStateKey;
 
     public VesselRecoveryStore(IncarnatePlugin plugin) {
         this.index = new VesselRecoveryIndex(plugin);
@@ -77,6 +80,7 @@ public final class VesselRecoveryStore {
         this.dragonPodiumZKey = new NamespacedKey(plugin, "vessel_recovery_dragon_podium_z");
         this.shulkerPeekKey = new NamespacedKey(plugin, "vessel_recovery_shulker_peek");
         this.shulkerAttachedFaceKey = new NamespacedKey(plugin, "vessel_recovery_shulker_attached_face");
+        this.snifferStateKey = new NamespacedKey(plugin, "vessel_recovery_sniffer_state");
     }
 
     public void save(Mob mob, PossessionOrigin origin, VesselState state) {
@@ -141,6 +145,11 @@ public final class VesselRecoveryStore {
                 data.set(shulkerAttachedFaceKey, PersistentDataType.STRING, state.shulkerAttachedFace().name());
             } else {
                 data.remove(shulkerAttachedFaceKey);
+            }
+            if (state.snifferState() != null) {
+                data.set(snifferStateKey, PersistentDataType.STRING, state.snifferState().name());
+            } else {
+                data.remove(snifferStateKey);
             }
             data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
         } catch (RuntimeException ex) {
@@ -277,6 +286,19 @@ public final class VesselRecoveryStore {
                 }
             }
         }
+        if (mob instanceof Frog frog) {
+            frog.setTongueTarget(null);
+        }
+        if (mob instanceof Sniffer sniffer) {
+            String stateName = data.get(snifferStateKey, PersistentDataType.STRING);
+            if (stateName != null) {
+                try {
+                    sniffer.setState(Sniffer.State.valueOf(stateName));
+                } catch (IllegalArgumentException ignored) {
+                    sniffer.setState(Sniffer.State.IDLING);
+                }
+            }
+        }
         if (mob instanceof Guardian guardian) {
             guardian.setLaser(false);
         }
@@ -313,6 +335,7 @@ public final class VesselRecoveryStore {
         data.remove(dragonPodiumZKey);
         data.remove(shulkerPeekKey);
         data.remove(shulkerAttachedFaceKey);
+        data.remove(snifferStateKey);
         index.forget(vesselId);
     }
 

@@ -20,6 +20,8 @@ import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Drowned;
 import org.bukkit.entity.DragonFireball;
 import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Frog;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Evoker;
 import org.bukkit.entity.EvokerFangs;
@@ -117,6 +119,13 @@ public final class AbilityRegistry {
     private final double shulkerBulletRange;
     private final double shulkerBulletRaySize;
     private final int shulkerBulletCooldownTicks;
+    private final boolean shulkerShellEnabled;
+    private final int shulkerShellCooldownTicks;
+    private final boolean frogTongueEnabled;
+    private final double frogTongueRange;
+    private final double frogTongueRaySize;
+    private final int frogTongueDurationTicks;
+    private final int frogTongueCooldownTicks;
 
     public AbilityRegistry(FileConfiguration config) {
         this.skeletonEnabled = config.getBoolean("abilities.skeleton.enabled", true);
@@ -178,9 +187,33 @@ public final class AbilityRegistry {
         this.shulkerBulletRange = Math.max(2.0, config.getDouble("abilities.shulker-bullet.range", 24.0));
         this.shulkerBulletRaySize = Math.max(0.0, config.getDouble("abilities.shulker-bullet.ray-size", 0.35));
         this.shulkerBulletCooldownTicks = Math.max(1, config.getInt("abilities.shulker-bullet.cooldown-ticks", 40));
+        this.shulkerShellEnabled = config.getBoolean("abilities.shulker-shell.enabled", true);
+        this.shulkerShellCooldownTicks = Math.max(1, config.getInt("abilities.shulker-shell.cooldown-ticks", 6));
+        this.frogTongueEnabled = config.getBoolean("abilities.frog-tongue.enabled", true);
+        this.frogTongueRange = Math.max(2.0, config.getDouble("abilities.frog-tongue.range", 10.0));
+        this.frogTongueRaySize = Math.max(0.0, config.getDouble("abilities.frog-tongue.ray-size", 0.30));
+        this.frogTongueDurationTicks = Math.max(1, config.getInt("abilities.frog-tongue.duration-ticks", 12));
+        this.frogTongueCooldownTicks = Math.max(1, config.getInt("abilities.frog-tongue.cooldown-ticks", 24));
+    }
+
+    public boolean trigger(PossessionSession session, AbilityGesture gesture) {
+        return switch (gesture) {
+            case PRIMARY -> triggerPrimaryInternal(session);
+            case SECONDARY -> triggerSecondaryInternal(session);
+            case SNEAK_PRIMARY -> triggerSneakPrimary(session);
+            case SPRINT_PRIMARY -> triggerPrimaryInternal(session);
+        };
     }
 
     public boolean triggerPrimary(PossessionSession session) {
+        return trigger(session, AbilityGesture.PRIMARY);
+    }
+
+    public boolean triggerSecondary(PossessionSession session) {
+        return trigger(session, AbilityGesture.SECONDARY);
+    }
+
+    private boolean triggerPrimaryInternal(PossessionSession session) {
         Mob vessel = session.vessel();
         if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
             return false;
@@ -215,12 +248,15 @@ public final class AbilityRegistry {
         return melee(session, vessel);
     }
 
-    public boolean triggerSecondary(PossessionSession session) {
+    private boolean triggerSecondaryInternal(PossessionSession session) {
         Mob vessel = session.vessel();
         if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
             return false;
         }
 
+        if (vessel instanceof Shulker shulker && shulkerShellEnabled) {
+            return toggleShulkerShell(session, shulker);
+        }
         if (vessel instanceof PufferFish pufferFish && pufferFishPuffEnabled) {
             return togglePufferFish(session, pufferFish);
         }
@@ -245,6 +281,17 @@ public final class AbilityRegistry {
         return false;
     }
 
+    private boolean triggerSneakPrimary(PossessionSession session) {
+        Mob vessel = session.vessel();
+        if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
+            return false;
+        }
+        if (vessel instanceof Frog frog && frogTongueEnabled) {
+            return startFrogTongue(session, frog);
+        }
+        return triggerPrimaryInternal(session);
+    }
+
     public void tick(PossessionSession session) {
         Mob vessel = session.vessel();
         if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
@@ -258,6 +305,9 @@ public final class AbilityRegistry {
         }
         if (vessel instanceof Evoker evoker) {
             tickEvokerCast(session, evoker);
+        }
+        if (vessel instanceof Frog frog) {
+            tickFrogTongue(session, frog);
         }
     }
 
@@ -279,11 +329,16 @@ public final class AbilityRegistry {
             }
             session.clearEvokerCast();
         }
+        if (vessel instanceof Frog frog && session.frogTongueTracked()) {
+            frog.setTongueTarget(null);
+            session.clearFrogTongue();
+        }
     }
 
     public String primaryLabel(Mob vessel) {
         if (vessel instanceof EnderDragon && dragonFireballEnabled) return "dragon-fireball";
         if (vessel instanceof Shulker && shulkerBulletEnabled) return "shulker-bullet";
+        if (vessel instanceof Frog && frogTongueEnabled) return "frog-melee-tongue";
         if (vessel instanceof Guardian && guardianLaserEnabled) return "guardian-laser";
         if (vessel instanceof Creeper && creeperEnabled) return "fuse";
         if (vessel instanceof AbstractSkeleton && skeletonEnabled) return "arrow-melee";
@@ -293,6 +348,7 @@ public final class AbilityRegistry {
     }
 
     public String secondaryLabel(Mob vessel) {
+        if (vessel instanceof Shulker && shulkerShellEnabled) return "shulker-shell";
         if (vessel instanceof PufferFish && pufferFishPuffEnabled) return "puff";
         if (vessel instanceof Vex && vexChargeEnabled) return "charge";
         if (vessel instanceof Evoker && evokerFangsEnabled) return "fangs";
@@ -317,12 +373,50 @@ public final class AbilityRegistry {
         if (target == null || !session.acquirePrimaryCooldown(shulkerBulletCooldownTicks)) {
             return false;
         }
-        shulker.setPeek(1.0f);
         shulker.getWorld().spawn(shulker.getEyeLocation(), ShulkerBullet.class, bullet -> {
             bullet.setShooter(shulker);
             bullet.setTarget(target);
         });
         return true;
+    }
+
+    private boolean toggleShulkerShell(PossessionSession session, Shulker shulker) {
+        if (!session.acquireSecondaryCooldown(shulkerShellCooldownTicks)) {
+            return false;
+        }
+        shulker.setPeek(shulker.getPeek() >= 0.5f ? 0.0f : 1.0f);
+        return true;
+    }
+
+    private boolean startFrogTongue(PossessionSession session, Frog frog) {
+        if (session.frogTongueTracked()) {
+            return false;
+        }
+        LivingEntity target = findLivingTarget(session, frog, frogTongueRange, frogTongueRaySize);
+        if (target == null || !session.acquirePrimaryCooldown(frogTongueCooldownTicks)) {
+            return false;
+        }
+        frog.setTongueTarget(target);
+        session.startFrogTongue(target.getUniqueId(), frogTongueDurationTicks);
+        return true;
+    }
+
+    private void tickFrogTongue(PossessionSession session, Frog frog) {
+        if (!session.frogTongueTracked()) {
+            return;
+        }
+        Entity target = frog.getTongueTarget();
+        if (session.frogTongueExpired()
+            || target == null
+            || !Bukkit.isOwnedByCurrentRegion(target)
+            || session.frogTongueTargetId() == null
+            || !target.getUniqueId().equals(session.frogTongueTargetId())
+            || !target.isValid()
+            || target.getWorld() != frog.getWorld()
+            || frog.getLocation().distanceSquared(target.getLocation()) > frogTongueRange * frogTongueRange) {
+            frog.setTongueTarget(null);
+            session.clearFrogTongue();
+        }
     }
 
     private boolean startGuardianLaser(PossessionSession session, Guardian guardian) {

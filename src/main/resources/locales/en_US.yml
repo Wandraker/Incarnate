@@ -63,6 +63,8 @@ messages:
   ability:
     dragon-fireball: 'dragon fireball'
     shulker-bullet: 'shulker bullet'
+    shulker-shell: 'shell open / close'
+    frog-melee-tongue: 'melee / Shift+LMB tongue'
     guardian-laser: 'guardian laser'
     fuse: 'fuse'
     arrow-melee: 'arrow / melee'

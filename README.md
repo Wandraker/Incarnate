@@ -94,7 +94,7 @@ When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible 
 
 This means tuned movement speeds, cooldowns, camera choices, release behavior, excluded mobs and other existing settings are not reset merely because a later release adds new options.
 
-## What 0.5.0 implements
+## What 0.6.0 implements
 
 ### Real bodies
 
@@ -153,6 +153,30 @@ Player input and HUD delivery run on the Player EntityScheduler. Vessel mutation
 
 Entity ray-trace consumers fail closed on Folia ownership before acting on a hit entity. Interrupted vessel recovery uses a durable UUID index so already-loaded bodies can also recover after restart/reload.
 
+### Ability gestures
+
+0.6.0 introduces a gesture dispatch layer so Incarnate is no longer limited internally to exactly one left-click action and one `F` action.
+
+Current gesture types are:
+
+- normal primary (`left click`);
+- secondary (`F` by default);
+- sneak-primary (`Shift + left click`);
+- sprint-primary (`Sprint + left click`).
+
+Gesture modifiers are configurable:
+
+```yaml
+input:
+  gestures:
+    sneak-primary: true
+    sprint-primary: true
+```
+
+A mob only consumes a special gesture when it has a dedicated native action for it; otherwise the gesture falls back to the ordinary primary action. This keeps existing mobs compatible while giving complex bodies additional control slots. True attack-button hold/release semantics are deliberately not emulated from repeated arm-swing packets because Paper does not expose a reliable held-left-click state.
+
+Frog is the first vessel using the extra channel: normal left click remains melee while `Shift + left click` uses its native tongue target API.
+
 ### Movement families
 
 Dedicated controllers exist for:
@@ -189,6 +213,7 @@ Implemented:
 - Guardian / Elder Guardian - real charging Guardian laser using a bounded vanilla Guardian attack-goal window;
 - Ender Dragon - real `DragonFireball`;
 - Shulker - real homing `ShulkerBullet` targeting the aimed living entity;
+- Frog - normal melee plus native tongue targeting on `Shift + left click`;
 - Creeper - real fuse toggle;
 - Pillager / Piglin - native ranged attack with crossbow;
 - Drowned - native ranged attack with trident;
@@ -203,7 +228,7 @@ Ender Dragon is controlled differently from ordinary flying mobs. Incarnate forc
 
 Shulker remains an attached body rather than becoming a generic walker. WASD moves it cell-by-cell along its current support surface; on wall attachments, jump/sneak can crawl vertically. Candidate cells and support blocks must belong to the current Folia region and be physically usable before the move is accepted.
 
-Both complex-body implementations require live gameplay validation before 0.5.0 is considered gameplay-final.
+Both complex-body implementations remain subject to live gameplay validation, especially camera feel and Shulker surface transitions.
 
 ### Secondary abilities
 
@@ -217,7 +242,8 @@ Implemented:
 - PufferFish - real puff-state toggle;
 - Vex - real charging state plus 3D charge impulse;
 - Ravager - native roar using the real Ravager roar state and vanilla/Paper damage behavior;
-- Evoker - a forward line of real `EvokerFangs` entities owned by the Evoker, with the real FANGS spell state and staggered attack delays.
+- Evoker - a forward line of real `EvokerFangs` entities owned by the Evoker, with the real FANGS spell state and staggered attack delays;
+- Shulker - real shell open/close through its native `peek` state.
 
 Evoker fang placement checks current Folia region ownership and only creates fangs where a valid ground location can be found. Count, spacing, attack-delay step, cast window and cooldown are configurable.
 
@@ -229,11 +255,17 @@ Paper provides a Goat ram API, but its implementation writes directly into Goat 
 
 Incarnate therefore does not currently expose Goat ram rather than leaving a possessed existing mob with silently modified brain state after `/release`.
 
+### Warden note
+
+Incarnate does not make a possessed Warden player literally blind by default. A future immersive sensory mode can represent vibrations or disturbances through HUD/audio cues without making the body impractical to control.
+
+The current Paper API exposes Warden anger and disturbance operations, but not a complete enumerable snapshot of every per-entity anger/Brain entry. For that reason 0.6.0 does not force native sonic-boom AI by mutating anger and then pretending the previous state can be restored exactly.
+
 ## Recovery
 
 Before taking over an existing Mob, Incarnate stores its original AI/awareness/persistence/despawn/aggressive/gravity and relevant special state in PDC. Interrupted sessions can recover marked vessels when they load again. Created orphan vessels are removed by default.
 
-Special-state restoration includes sitting state, Bat awake state, Camel dash, Creeper ignition/fuse progress, Guardian laser handling, PufferFish puff state, Vex charging state, Ravager attack/stun/roar ticks, the current Spellcaster spell state, Ender Dragon phase/podium, and Shulker peek/attachment face.
+Special-state restoration includes sitting state, Bat awake state, Camel dash, Creeper ignition/fuse progress, Guardian laser handling, PufferFish puff state, Vex charging state, Ravager attack/stun/roar ticks, the current Spellcaster spell state, Ender Dragon phase/podium, Shulker peek/attachment face, Frog tongue target for normal release, and Sniffer state. Interrupted Frog recovery clears a stale tongue target instead of trying to resurrect an unsafe entity reference.
 
 On normal release, a pre-possession combat target is restored only when it is still alive and safely owned by the same Folia region.
 
