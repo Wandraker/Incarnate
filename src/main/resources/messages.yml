@@ -1,0 +1,17 @@
+config-version: 1
+locale: auto
+fallback-locale: en_US
+
+theme:
+  primary: "#B77A52"
+  secondary: "#7F9161"
+  accent: "#D3A354"
+  text: "#DDD4C2"
+  muted: "#958B7C"
+  success: "#83A96B"
+  warning: "#D7A14B"
+  error: "#C96858"
+
+prefix: "<gradient:#B77A52:#7F9161><bold>INCARNATE</bold></gradient> <dark_gray>›</dark_gray>"
+
+messages: {}
