@@ -77,6 +77,31 @@ World concealment uses a short hide/show tracking pulse rather than keeping a lo
 
 Per-viewer tab-list ownership is persisted separately so an interrupted plugin reload can restore entries that the previous Incarnate instance removed instead of leaving a player absent from TAB until reconnect.
 
+### Elysium Private Tag integration
+
+Incarnate has an optional integration with `Elysium_Private_Tag` V4.1+.
+
+The integration does not manipulate Private Tag `TextDisplay` entities directly. It uses the source-aware public methods exposed by Elysium Private Tag:
+
+- `hideTag(Player, String)`
+- `showTag(Player, String)`
+
+Incarnate uses the source name `Incarnate`. When possession becomes active, the player's overhead tag is suppressed before the controller enters spectator mode. The suppression stays active through release teleport, death/respawn recovery and interrupted-session recovery, then only Incarnate's own suppression source is removed after recovery succeeds.
+
+This means another system can hide the same tag at the same time without Incarnate accidentally making it visible. For example, a death-system suppression remains in effect even when Incarnate releases its own source.
+
+The integration is a soft dependency and uses reflection rather than a compile-time dependency. Incarnate works normally when Elysium Private Tag is not installed or is disabled. On Incarnate startup, stale `Incarnate` suppression is cleared for already-online players so a hot plugin reload cannot leave their tag hidden permanently. A full server crash is also safe because Elysium Private Tag suppression state is in memory and Incarnate independently recovers the Player state on startup.
+
+Default configuration:
+
+```yaml
+integrations:
+  elysium-private-tag:
+    enabled: true
+    plugin-name: Elysium_Private_Tag
+    source: Incarnate
+```
+
 ### Folia-safe ownership model
 
 Player input is sampled on the Player EntityScheduler. Vessel mutation runs on the Mob EntityScheduler. Cross-region control uses snapshots rather than reading live Player state from the vessel thread.
