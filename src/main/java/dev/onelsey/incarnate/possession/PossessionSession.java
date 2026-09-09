@@ -36,6 +36,8 @@ public final class PossessionSession {
     private volatile long guardianLaserDeadlineTick = Long.MIN_VALUE;
     private volatile long vexChargeUntilTick = Long.MIN_VALUE;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
+    private volatile CameraTransport cameraTransport = CameraTransport.NONE;
+    private volatile boolean cameraTeleportInProgress;
 
     public PossessionSession(
         UUID playerId,
@@ -90,6 +92,13 @@ public final class PossessionSession {
     public void controlTask(ScheduledTask controlTask) { this.controlTask = controlTask; }
     public ScheduledTask inputSamplerTask() { return inputSamplerTask; }
     public void inputSamplerTask(ScheduledTask task) { this.inputSamplerTask = task; }
+
+    public CameraTransport cameraTransport() { return cameraTransport; }
+    public void cameraTransport(CameraTransport cameraTransport) { this.cameraTransport = cameraTransport; }
+    public boolean usesMountedCamera() { return cameraTransport == CameraTransport.MOUNTED; }
+    public boolean usesSpectatorTargetCamera() { return cameraTransport == CameraTransport.SPECTATOR_TARGET; }
+    public boolean cameraTeleportInProgress() { return cameraTeleportInProgress; }
+    public void cameraTeleportInProgress(boolean value) { this.cameraTeleportInProgress = value; }
 
     public long controlTick() { return controlTick; }
     public long advanceControlTick() { return ++controlTick; }
