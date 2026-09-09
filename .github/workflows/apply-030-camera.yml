@@ -17,7 +17,7 @@ jobs:
           persist-credentials: true
 
       - name: Apply mounted camera patch
-        run: python3 tools/apply_030_camera.py
+        run: python3 tools/apply_030_camera_v2.py
 
       - name: Commit mounted camera
         shell: bash
