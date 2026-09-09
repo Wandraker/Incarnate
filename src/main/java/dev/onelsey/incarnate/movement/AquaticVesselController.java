@@ -32,6 +32,11 @@ public final class AquaticVesselController implements VesselController {
         vessel.setBodyYaw(view.yaw());
         vessel.setJumping(false);
 
+        if (session.isMovementControlLocked()) {
+            session.lastKnownVesselLocation(vessel.getLocation());
+            return;
+        }
+
         if (!vessel.isInWater()) {
             Vector beached = vessel.getVelocity();
             if (vessel.getNoDamageTicks() == 0) {
