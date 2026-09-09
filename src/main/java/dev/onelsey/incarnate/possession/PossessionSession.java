@@ -4,6 +4,8 @@ import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.ViewSnapshot;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Location;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 
@@ -20,24 +22,29 @@ public final class PossessionSession {
     private final PlayerState playerState;
     private final VesselState vesselState;
     private final AtomicBoolean active = new AtomicBoolean(true);
+    private final CooldownWindow primaryCooldown = new CooldownWindow();
+    private final CooldownWindow secondaryCooldown = new CooldownWindow();
 
     private volatile InputSnapshot input;
     private volatile ViewSnapshot view;
     private volatile Location lastKnownVesselLocation;
     private volatile ScheduledTask controlTask;
     private volatile ScheduledTask inputSamplerTask;
+    private volatile ScheduledTask hudTask;
     private volatile long controlTick;
-    private volatile long lastPrimaryAbilityTick = Long.MIN_VALUE;
-    private volatile long lastSecondaryAbilityTick = Long.MIN_VALUE;
     private volatile long movementControlLockedUntilTick = Long.MIN_VALUE;
     private volatile boolean guardianLaserActive;
     private volatile boolean guardianLaserSeenActive;
     private volatile UUID guardianLaserTargetId;
     private volatile long guardianLaserDeadlineTick = Long.MIN_VALUE;
     private volatile long vexChargeUntilTick = Long.MIN_VALUE;
+    private volatile long evokerCastUntilTick = Long.MIN_VALUE;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
     private volatile CameraTransport cameraTransport = CameraTransport.NONE;
     private volatile boolean cameraTeleportInProgress;
+    private volatile String primaryAbilityKey = "none";
+    private volatile String secondaryAbilityKey = "none";
+    private volatile VesselTelemetry telemetry;
 
     public PossessionSession(
         UUID playerId,
@@ -60,6 +67,7 @@ public final class PossessionSession {
         this.input = initialInput;
         this.view = initialView;
         this.lastKnownVesselLocation = vessel.getLocation().clone();
+        this.telemetry = new VesselTelemetry(vessel.getHealth(), maxHealth(vessel));
     }
 
     public UUID playerId() { return playerId; }
@@ -92,6 +100,8 @@ public final class PossessionSession {
     public void controlTask(ScheduledTask controlTask) { this.controlTask = controlTask; }
     public ScheduledTask inputSamplerTask() { return inputSamplerTask; }
     public void inputSamplerTask(ScheduledTask task) { this.inputSamplerTask = task; }
+    public ScheduledTask hudTask() { return hudTask; }
+    public void hudTask(ScheduledTask task) { this.hudTask = task; }
 
     public CameraTransport cameraTransport() { return cameraTransport; }
     public void cameraTransport(CameraTransport cameraTransport) { this.cameraTransport = cameraTransport; }
@@ -104,23 +114,33 @@ public final class PossessionSession {
     public long advanceControlTick() { return ++controlTick; }
 
     public boolean acquirePrimaryCooldown(int cooldownTicks) {
-        long now = controlTick;
-        long last = lastPrimaryAbilityTick;
-        if (last != Long.MIN_VALUE && now - last < Math.max(1, cooldownTicks)) {
-            return false;
-        }
-        lastPrimaryAbilityTick = now;
-        return true;
+        return primaryCooldown.tryAcquire(controlTick, cooldownTicks);
     }
 
     public boolean acquireSecondaryCooldown(int cooldownTicks) {
-        long now = controlTick;
-        long last = lastSecondaryAbilityTick;
-        if (last != Long.MIN_VALUE && now - last < Math.max(1, cooldownTicks)) {
-            return false;
-        }
-        lastSecondaryAbilityTick = now;
-        return true;
+        return secondaryCooldown.tryAcquire(controlTick, cooldownTicks);
+    }
+
+    public int primaryCooldownRemainingTicks() {
+        return primaryCooldown.remaining(controlTick);
+    }
+
+    public int secondaryCooldownRemainingTicks() {
+        return secondaryCooldown.remaining(controlTick);
+    }
+
+    public void abilityKeys(String primary, String secondary) {
+        this.primaryAbilityKey = primary == null ? "none" : primary;
+        this.secondaryAbilityKey = secondary == null ? "none" : secondary;
+    }
+
+    public String primaryAbilityKey() { return primaryAbilityKey; }
+    public String secondaryAbilityKey() { return secondaryAbilityKey; }
+
+    public VesselTelemetry telemetry() { return telemetry; }
+
+    public void updateTelemetry(double health, double maxHealth) {
+        telemetry = new VesselTelemetry(health, maxHealth);
     }
 
     public void lockMovementControl(int ticks) {
@@ -170,6 +190,22 @@ public final class PossessionSession {
         vexChargeUntilTick = Long.MIN_VALUE;
     }
 
+    public void startEvokerCast(int ticks) {
+        evokerCastUntilTick = controlTick + Math.max(1, ticks);
+    }
+
+    public boolean evokerCastTracked() {
+        return evokerCastUntilTick != Long.MIN_VALUE;
+    }
+
+    public boolean evokerCastExpired() {
+        return evokerCastTracked() && controlTick > evokerCastUntilTick;
+    }
+
+    public void clearEvokerCast() {
+        evokerCastUntilTick = Long.MIN_VALUE;
+    }
+
     public void markSpectatorShiftAttempt() {
         this.lastSpectatorShiftAttemptNanos = System.nanoTime();
     }
@@ -177,5 +213,10 @@ public final class PossessionSession {
     public boolean hasRecentSpectatorShiftAttempt(long windowNanos) {
         long last = lastSpectatorShiftAttemptNanos;
         return last != Long.MIN_VALUE && System.nanoTime() - last <= windowNanos;
+    }
+
+    private static double maxHealth(Mob vessel) {
+        AttributeInstance attribute = vessel.getAttribute(Attribute.MAX_HEALTH);
+        return attribute == null ? Math.max(vessel.getHealth(), 1.0) : attribute.getValue();
     }
 }
