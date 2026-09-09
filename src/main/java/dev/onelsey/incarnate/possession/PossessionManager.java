@@ -14,12 +14,15 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -45,6 +48,10 @@ public final class PossessionManager {
     private final CameraTransport cameraMode;
     private final int cameraMountRetries;
     private final boolean cameraFallbackToSpectatorTarget;
+    private final boolean hudEnabled;
+    private final int hudIntervalTicks;
+    private final boolean hudShowHealth;
+    private final boolean hudShowAbilities;
     private final PlayerRecoveryStore playerRecovery;
     private final VesselRecoveryStore vesselRecovery;
 
@@ -75,6 +82,10 @@ public final class PossessionManager {
         this.cameraMode = configuredCamera == CameraTransport.NONE ? CameraTransport.MOUNTED : configuredCamera;
         this.cameraMountRetries = Math.max(1, plugin.getConfig().getInt("camera.mount-retries", 8));
         this.cameraFallbackToSpectatorTarget = plugin.getConfig().getBoolean("camera.fallback-to-spectator-target", true);
+        this.hudEnabled = plugin.getConfig().getBoolean("hud.actionbar.enabled", true);
+        this.hudIntervalTicks = Math.max(1, plugin.getConfig().getInt("hud.actionbar.interval-ticks", 4));
+        this.hudShowHealth = plugin.getConfig().getBoolean("hud.actionbar.show-health", true);
+        this.hudShowAbilities = plugin.getConfig().getBoolean("hud.actionbar.show-abilities", true);
         this.playerRecovery = new PlayerRecoveryStore(plugin);
         this.vesselRecovery = new VesselRecoveryStore(plugin);
     }
@@ -227,6 +238,7 @@ public final class PossessionManager {
                     initialInput,
                     initialView
                 );
+                session.abilityKeys(abilities.primaryLabel(vessel), abilities.secondaryLabel(vessel));
 
                 if (byPlayer.putIfAbsent(playerId, session) != null) {
                     rollbackPreparedVessel(vessel, origin, vesselState);
@@ -280,6 +292,7 @@ public final class PossessionManager {
 
             playerRecovery.save(player, session.playerState());
             startInputSampler(session);
+            startHud(session);
             player.setGameMode(GameMode.SPECTATOR);
             try {
                 player.setSpectatorTarget(null);
@@ -410,12 +423,61 @@ public final class PossessionManager {
 
     private void sendAcquiredMessage(PossessionSession session, String cameraKey) {
         Player player = session.player();
-        Mob vessel = session.vessel();
         notifyPlayer(player, "acquired", Map.of(
             "camera", messages.cameraLabel(player, cameraKey),
-            "primary_action", messages.abilityLabel(player, abilities.primaryLabel(vessel)),
-            "secondary_action", messages.abilityLabel(player, abilities.secondaryLabel(vessel))
+            "primary_action", messages.abilityLabel(player, session.primaryAbilityKey()),
+            "secondary_action", messages.abilityLabel(player, session.secondaryAbilityKey())
         ));
+    }
+
+    private void startHud(PossessionSession session) {
+        if (!hudEnabled || (!hudShowHealth && !hudShowAbilities)) {
+            return;
+        }
+        Player player = session.player();
+        ScheduledTask hudTask = player.getScheduler().runAtFixedRate(plugin, task -> {
+            if (!session.isActive() || !player.isOnline()) {
+                task.cancel();
+                return;
+            }
+
+            VesselTelemetry telemetry = session.telemetry();
+            String messageKey = hudShowHealth && hudShowAbilities
+                ? "hud.line"
+                : hudShowHealth ? "hud.health-only" : "hud.abilities-only";
+
+            player.sendActionBar(messages.render(player, messageKey, Map.of(
+                "health", Component.text(formatHudNumber(telemetry.health())),
+                "max_health", Component.text(formatHudNumber(telemetry.maxHealth())),
+                "primary_action", messages.abilityLabel(player, session.primaryAbilityKey()),
+                "secondary_action", messages.abilityLabel(player, session.secondaryAbilityKey()),
+                "primary_state", cooldownState(player, session.primaryAbilityKey(), session.primaryCooldownRemainingTicks()),
+                "secondary_state", cooldownState(player, session.secondaryAbilityKey(), session.secondaryCooldownRemainingTicks())
+            )));
+        }, null, 1L, hudIntervalTicks);
+        session.hudTask(hudTask);
+        if (hudTask == null) {
+            requestRelease(session, ReleaseReason.QUIT);
+        }
+    }
+
+    private Component cooldownState(Player player, String abilityKey, int remainingTicks) {
+        if ("none".equals(abilityKey)) {
+            return messages.render(player, "hud.unavailable");
+        }
+        if (remainingTicks <= 0) {
+            return messages.render(player, "hud.ready");
+        }
+        return messages.render(player, "hud.cooldown", Map.of(
+            "seconds", Component.text(formatHudNumber(remainingTicks / 20.0))
+        ));
+    }
+
+    private static String formatHudNumber(double value) {
+        if (Math.abs(value - Math.rint(value)) < 0.05) {
+            return String.format(Locale.ROOT, "%.0f", value);
+        }
+        return String.format(Locale.ROOT, "%.1f", value);
     }
 
     private void startInputSampler(PossessionSession session) {
@@ -450,6 +512,7 @@ public final class PossessionManager {
             }
 
             session.advanceControlTick();
+            updateVesselTelemetry(session, vessel);
             try {
                 controller.tick(session, vessel);
                 session.lastKnownVesselLocation(vessel.getLocation());
@@ -475,6 +538,12 @@ public final class PossessionManager {
         if (controlTask == null) {
             requestRelease(session, ReleaseReason.VESSEL_REMOVED);
         }
+    }
+
+    private static void updateVesselTelemetry(PossessionSession session, Mob vessel) {
+        AttributeInstance maxHealth = vessel.getAttribute(Attribute.MAX_HEALTH);
+        double max = maxHealth == null ? Math.max(1.0, vessel.getHealth()) : maxHealth.getValue();
+        session.updateTelemetry(vessel.getHealth(), max);
     }
 
     public void updateInput(Player player, InputSnapshot input) {
@@ -597,6 +666,10 @@ public final class PossessionManager {
         ScheduledTask input = session.inputSamplerTask();
         if (input != null) {
             input.cancel();
+        }
+        ScheduledTask hud = session.hudTask();
+        if (hud != null) {
+            hud.cancel();
         }
     }
 
