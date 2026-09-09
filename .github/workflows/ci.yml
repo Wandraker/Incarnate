@@ -76,13 +76,16 @@ jobs:
           cp build/libs/Incarnate-0.1.0.jar ci-server/plugins/Incarnate.jar
           cp paper.jar ci-server/paper.jar
           printf 'eula=true\n' > ci-server/eula.txt
+          mkfifo ci-server/server-input
+          exec 3<>ci-server/server-input
 
           cd ci-server
-          java -Xms768M -Xmx1536M -jar paper.jar --nogui > ../paper-smoke.log 2>&1 &
+          java -Xms768M -Xmx1536M -jar paper.jar --nogui < server-input > ../paper-smoke.log 2>&1 &
           SERVER_PID=$!
           cd ..
 
           cleanup() {
+            exec 3>&- 2>/dev/null || true
             if kill -0 "$SERVER_PID" 2>/dev/null; then
               kill -TERM "$SERVER_PID" 2>/dev/null || true
               sleep 2
@@ -93,30 +96,32 @@ jobs:
           }
           trap cleanup EXIT
 
-          ENABLED=0
-          for _ in $(seq 1 90); do
-            if grep -Fq 'Incarnate 0.1.0 enabled for Minecraft 26.2+' paper-smoke.log 2>/dev/null; then
-              ENABLED=1
+          READY=0
+          for _ in $(seq 1 100); do
+            if grep -Eq 'Done \([^)]*\)! For help, type "help"' paper-smoke.log 2>/dev/null \
+              && grep -Fq 'Incarnate 0.1.0 enabled for Minecraft 26.2+' paper-smoke.log 2>/dev/null; then
+              READY=1
               break
             fi
             if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-              echo 'Paper exited before Incarnate enabled.'
+              echo 'Paper exited before startup completed.'
               cat paper-smoke.log || true
               exit 1
             fi
             sleep 1
           done
 
-          if [ "$ENABLED" -ne 1 ]; then
-            echo 'Timed out waiting for Incarnate to enable.'
+          if [ "$READY" -ne 1 ]; then
+            echo 'Timed out waiting for Paper and Incarnate startup.'
             cat paper-smoke.log || true
             exit 1
           fi
 
-          kill -TERM "$SERVER_PID"
+          printf 'stop\n' >&3
+          exec 3>&-
 
           STOPPED=0
-          for _ in $(seq 1 35); do
+          for _ in $(seq 1 45); do
             if ! kill -0 "$SERVER_PID" 2>/dev/null; then
               STOPPED=1
               break
@@ -125,7 +130,7 @@ jobs:
           done
 
           if [ "$STOPPED" -ne 1 ]; then
-            echo 'Paper did not stop cleanly after SIGTERM.'
+            echo 'Paper did not stop cleanly after the stop command.'
             cat paper-smoke.log || true
             exit 1
           fi
