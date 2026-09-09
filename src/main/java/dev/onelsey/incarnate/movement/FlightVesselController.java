@@ -3,19 +3,27 @@ package dev.onelsey.incarnate.movement;
 import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.ViewSnapshot;
 import dev.onelsey.incarnate.possession.PossessionSession;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Mob;
 import org.bukkit.util.Vector;
 
 public final class FlightVesselController implements VesselController {
-    private final double speed;
+    private final double fallbackSpeed;
+    private final double attributeScale;
+    private final double minimumSpeed;
+    private final double maximumSpeed;
     private final double sprintMultiplier;
     private final double acceleration;
     private final double idleDamping;
     private final double hurtControl;
 
     public FlightVesselController(FileConfiguration config) {
-        this.speed = config.getDouble("movement.flight.speed", 0.34);
+        this.fallbackSpeed = config.getDouble("movement.flight.speed", 0.34);
+        this.attributeScale = config.getDouble("movement.flight.attribute-scale", 1.0);
+        this.minimumSpeed = config.getDouble("movement.flight.minimum-speed", 0.12);
+        this.maximumSpeed = config.getDouble("movement.flight.maximum-speed", 0.65);
         this.sprintMultiplier = config.getDouble("movement.flight.sprint-multiplier", 1.35);
         this.acceleration = MovementMath.clamp01(config.getDouble("movement.flight.acceleration", 0.55));
         this.idleDamping = MovementMath.clamp01(config.getDouble("movement.flight.idle-damping", 0.72));
@@ -36,7 +44,7 @@ public final class FlightVesselController implements VesselController {
         Vector current = vessel.getVelocity();
 
         if (wanted.lengthSquared() > 0.0001) {
-            double targetSpeed = speed * (input.sprint() ? sprintMultiplier : 1.0);
+            double targetSpeed = resolveFlyingSpeed(vessel) * (input.sprint() ? sprintMultiplier : 1.0);
             double control = vessel.getNoDamageTicks() > 0 ? acceleration * hurtControl : acceleration;
             wanted.multiply(targetSpeed);
             current.setX(MovementMath.lerp(current.getX(), wanted.getX(), control));
@@ -48,5 +56,13 @@ public final class FlightVesselController implements VesselController {
 
         vessel.setVelocity(current);
         session.lastKnownVesselLocation(vessel.getLocation());
+    }
+
+    private double resolveFlyingSpeed(Mob vessel) {
+        AttributeInstance flying = vessel.getAttribute(Attribute.FLYING_SPEED);
+        double resolved = flying == null || flying.getValue() <= 0.0
+            ? fallbackSpeed
+            : flying.getValue() * attributeScale;
+        return Math.max(minimumSpeed, Math.min(maximumSpeed, resolved));
     }
 }
