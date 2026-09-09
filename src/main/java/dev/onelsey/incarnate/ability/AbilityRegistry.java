@@ -221,7 +221,7 @@ public final class AbilityRegistry {
     }
 
     private boolean pounceSpider(PossessionSession session, Spider spider) {
-        if (!spider.isOnGround() || !session.acquireSecondaryCooldown(spiderPounceCooldownTicks)) {
+        if (!spider.isOnGround()) {
             return false;
         }
 
@@ -230,6 +230,10 @@ public final class AbilityRegistry {
         if (horizontal.lengthSquared() < 1.0E-6) {
             return false;
         }
+        if (!session.acquireSecondaryCooldown(spiderPounceCooldownTicks)) {
+            return false;
+        }
+
         horizontal.normalize().multiply(spiderPounceHorizontalSpeed);
         horizontal.setY(spiderPounceVerticalVelocity);
         session.lockMovementControl(spiderPounceLockTicks);
@@ -238,13 +242,16 @@ public final class AbilityRegistry {
     }
 
     private boolean dashCamel(PossessionSession session, Camel camel) {
-        if (!camel.isOnGround() || !session.acquireSecondaryCooldown(camelDashCooldownTicks)) {
+        if (!camel.isOnGround()) {
             return false;
         }
 
         Vector horizontal = direction(session.view());
         horizontal.setY(0.0);
         if (horizontal.lengthSquared() < 1.0E-6) {
+            return false;
+        }
+        if (!session.acquireSecondaryCooldown(camelDashCooldownTicks)) {
             return false;
         }
 
