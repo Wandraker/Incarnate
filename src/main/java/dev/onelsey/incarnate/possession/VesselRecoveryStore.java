@@ -48,7 +48,7 @@ public final class VesselRecoveryStore {
 
         try {
             PersistentDataContainer data = mob.getPersistentDataContainer();
-            data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
+            data.remove(activeKey);
             data.set(originKey, PersistentDataType.STRING, origin.name());
             data.set(awareKey, PersistentDataType.BYTE, bool(state.aware()));
             data.set(aiKey, PersistentDataType.BYTE, bool(state.ai()));
@@ -63,6 +63,7 @@ public final class VesselRecoveryStore {
             } else {
                 data.remove(creeperFuseTicksKey);
             }
+            data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
         } catch (RuntimeException ex) {
             index.forget(vesselId);
             throw ex;
