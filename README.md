@@ -66,6 +66,8 @@ Interrupted vessel recovery uses a durable UUID index so already-loaded Mob bodi
 
 Ordinary ground bodies use their real `MOVEMENT_SPEED` and `JUMP_STRENGTH` attributes where available. Flying bodies use their real `FLYING_SPEED` attribute where available, with configurable safety clamps and a fallback speed for entities without that attribute.
 
+Burst movement abilities use a short movement-control lock so the normal WASD controller does not immediately overwrite the physical impulse on the next server tick.
+
 Unknown/future Mob types fall back to ground movement rather than packet disguise logic.
 
 ### Primary abilities
@@ -81,7 +83,11 @@ Implemented in 0.1.0:
 - Snow Golem: Snowball;
 - Llama / Trader Llama: Llama Spit;
 - Breeze: Breeze Wind Charge;
-- Creeper: primary toggles the real creeper fuse.
+- Creeper: primary toggles the real creeper fuse;
+- Pillager / Piglin: native Paper ranged attack when holding a crossbow;
+- Drowned: native ranged attack when holding a trident;
+- Illusioner: native ranged attack when holding a bow;
+- Witch: native ranged attack through the Mob's own ranged attack implementation.
 
 Other mobs fall back to a real melee attack when a living target is under the vessel crosshair. Damage, held equipment and knockback are evaluated by the Mob/Paper attack path, not by the hidden Player.
 
@@ -92,7 +98,8 @@ Secondary abilities use a separate cooldown channel from primary attacks.
 Implemented in 0.1.0:
 
 - Enderman: directional teleport with collision ray tracing and a safe landing search;
-- Spider / Cave Spider: forward pounce from the real body while grounded.
+- Spider / Cave Spider: forward pounce from the real body while grounded;
+- Camel: real dashing state plus a physical forward dash impulse.
 
 More secondary abilities can be added per Mob without changing the possession core.
 
@@ -100,9 +107,15 @@ More secondary abilities can be added per Mob without changing the possession co
 
 Before taking over an existing Mob, Incarnate stores its original AI/awareness/persistence/despawn/aggressive/gravity and special-state data in PDC. Interrupted sessions can restore marked vessels when they load again. Created orphan vessels are removed by default.
 
+Special-state restoration currently includes sitting state, Bat awake/hanging state, Camel dashing state and Creeper ignition/fuse progress.
+
 On a normal release, Incarnate also restores the Mob's pre-possession combat target when that target is still alive and safely owned by the same Folia region. It deliberately does not perform a cross-region target restore.
 
 The Player's original game mode, flight permission, flight state, fly speed, world, location and rotation are stored for interrupted-session recovery. Recovery remains pending instead of deleting its marker if the saved world is temporarily unavailable.
+
+### AI suppression note
+
+0.1.0 keeps the real Mob AI flag enabled but temporarily sets the body to unaware while it is player-controlled. This is currently the safest public-API way to suppress autonomous pathfinding without making the entity immobile. Paper notes that unaware mobs can also have some unspecified autonomous/environmental behavior disabled, so live gameplay testing remains required before the first public release. Incarnate restores the original awareness state on release and interrupted-session recovery.
 
 ## Validation
 
