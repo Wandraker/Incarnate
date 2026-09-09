@@ -93,6 +93,13 @@ abilities:
     horizontal-speed: 0.85
     vertical-velocity: 0.42
     cooldown-ticks: 18
+    movement-lock-ticks: 5
+  camel-dash:
+    enabled: true
+    horizontal-speed: 1.15
+    vertical-velocity: 0.12
+    cooldown-ticks: 30
+    movement-lock-ticks: 8
 
 excluded-types:
   - ENDER_DRAGON
