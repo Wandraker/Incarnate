@@ -5,6 +5,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Sittable;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -21,6 +22,7 @@ public final class VesselRecoveryStore {
     private final NamespacedKey removeFarKey;
     private final NamespacedKey aggressiveKey;
     private final NamespacedKey gravityKey;
+    private final NamespacedKey sittingKey;
     private final NamespacedKey batAwakeKey;
     private final NamespacedKey creeperIgnitedKey;
     private final NamespacedKey creeperFuseTicksKey;
@@ -35,6 +37,7 @@ public final class VesselRecoveryStore {
         this.removeFarKey = new NamespacedKey(plugin, "vessel_recovery_remove_far");
         this.aggressiveKey = new NamespacedKey(plugin, "vessel_recovery_aggressive");
         this.gravityKey = new NamespacedKey(plugin, "vessel_recovery_gravity");
+        this.sittingKey = new NamespacedKey(plugin, "vessel_recovery_sitting");
         this.batAwakeKey = new NamespacedKey(plugin, "vessel_recovery_bat_awake");
         this.creeperIgnitedKey = new NamespacedKey(plugin, "vessel_recovery_creeper_ignited");
         this.creeperFuseTicksKey = new NamespacedKey(plugin, "vessel_recovery_creeper_fuse_ticks");
@@ -56,6 +59,7 @@ public final class VesselRecoveryStore {
             data.set(removeFarKey, PersistentDataType.BYTE, bool(state.removeWhenFarAway()));
             data.set(aggressiveKey, PersistentDataType.BYTE, bool(state.aggressive()));
             data.set(gravityKey, PersistentDataType.BYTE, bool(state.gravity()));
+            setNullableBool(data, sittingKey, state.sitting());
             setNullableBool(data, batAwakeKey, state.batAwake());
             setNullableBool(data, creeperIgnitedKey, state.creeperIgnited());
             if (state.creeperFuseTicks() != null) {
@@ -104,6 +108,12 @@ public final class VesselRecoveryStore {
         mob.setAggressive(readBool(data, aggressiveKey, false));
         mob.setGravity(readBool(data, gravityKey, mob.hasGravity()));
 
+        if (mob instanceof Sittable sittable) {
+            Boolean sitting = readNullableBool(data, sittingKey);
+            if (sitting != null) {
+                sittable.setSitting(sitting);
+            }
+        }
         if (mob instanceof Bat bat) {
             Boolean awake = readNullableBool(data, batAwakeKey);
             if (awake != null) {
@@ -111,7 +121,6 @@ public final class VesselRecoveryStore {
                 bat.setTargetLocation(null);
             }
         }
-
         if (mob instanceof Creeper creeper) {
             Boolean ignited = readNullableBool(data, creeperIgnitedKey);
             Integer fuseTicks = data.get(creeperFuseTicksKey, PersistentDataType.INTEGER);
@@ -135,6 +144,7 @@ public final class VesselRecoveryStore {
         data.remove(removeFarKey);
         data.remove(aggressiveKey);
         data.remove(gravityKey);
+        data.remove(sittingKey);
         data.remove(batAwakeKey);
         data.remove(creeperIgnitedKey);
         data.remove(creeperFuseTicksKey);
