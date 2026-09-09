@@ -71,7 +71,7 @@ public final class PossessionVisibilityManager {
             return;
         }
         Player controller = Bukkit.getPlayer(controllerId);
-        if (controller == null || !controller.isOnline()) {
+        if (controller == null) {
             return;
         }
 
@@ -89,7 +89,7 @@ public final class PossessionVisibilityManager {
                 return;
             }
             Player controller = Bukkit.getPlayer(controllerId);
-            if (controller == null || !controller.isOnline()) {
+            if (controller == null) {
                 return;
             }
 
