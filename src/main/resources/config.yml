@@ -76,6 +76,12 @@ abilities:
     enabled: true
     speed: 1.5
     cooldown-ticks: 14
+  native-ranged:
+    enabled: true
+    range: 24.0
+    ray-size: 0.35
+    charge: 1.0
+    cooldown-ticks: 20
   creeper:
     enabled: true
     cooldown-ticks: 5
