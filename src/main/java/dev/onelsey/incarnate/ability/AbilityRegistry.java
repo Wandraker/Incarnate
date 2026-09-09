@@ -224,11 +224,11 @@ public final class AbilityRegistry {
     }
 
     public String primaryLabel(Mob vessel) {
-        if (vessel instanceof Guardian && guardianLaserEnabled) return "guardian laser";
+        if (vessel instanceof Guardian && guardianLaserEnabled) return "guardian-laser";
         if (vessel instanceof Creeper && creeperEnabled) return "fuse";
-        if (vessel instanceof AbstractSkeleton && skeletonEnabled) return "arrow / melee";
+        if (vessel instanceof AbstractSkeleton && skeletonEnabled) return "arrow-melee";
         if (nativeProjectilesEnabled && projectileFor(vessel) != null) return "projectile";
-        if (nativeRangedEnabled && vessel instanceof RangedEntity && supportsNativeRanged(vessel)) return "ranged attack / melee";
+        if (nativeRangedEnabled && vessel instanceof RangedEntity && supportsNativeRanged(vessel)) return "ranged-melee";
         return meleeEnabled ? "melee" : "none";
     }
 

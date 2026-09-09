@@ -4,6 +4,7 @@ import dev.onelsey.incarnate.IncarnatePlugin;
 import dev.onelsey.incarnate.ability.AbilityRegistry;
 import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.ViewSnapshot;
+import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
 import dev.onelsey.incarnate.movement.VesselController;
 import dev.onelsey.incarnate.permission.IncarnatePermissions;
@@ -30,6 +31,7 @@ public final class PossessionManager {
     private final ControllerRegistry controllers;
     private final AbilityRegistry abilities;
     private final PossessionVisibilityManager visibility;
+    private final MessageService messages;
     private final Map<UUID, PossessionSession> byPlayer = new ConcurrentHashMap<>();
     private final Map<UUID, PossessionSession> byVessel = new ConcurrentHashMap<>();
     private final Set<UUID> pendingPlayers = ConcurrentHashMap.newKeySet();
@@ -51,12 +53,14 @@ public final class PossessionManager {
         ControllerRegistry controllers,
         AbilityRegistry abilities,
         PossessionVisibilityManager visibility,
+        MessageService messages,
         Set<EntityType> excluded
     ) {
         this.plugin = plugin;
         this.controllers = controllers;
         this.abilities = abilities;
         this.visibility = visibility;
+        this.messages = messages;
         this.excluded = Set.copyOf(excluded);
         this.removeCreatedOnRelease = plugin.getConfig().getBoolean("created-vessels.remove-on-release", true);
         this.removeOrphanedCreated = plugin.getConfig().getBoolean("created-vessels.remove-orphaned-after-recovery", true);
@@ -118,49 +122,49 @@ public final class PossessionManager {
         EntityType vesselType = vessel.getType();
 
         if (origin == PossessionOrigin.CREATED && !player.hasPermission(IncarnatePermissions.CREATE)) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] You do not have permission to create vessels.");
+            rejectBeforeStart(player, vessel, origin, "permission-create");
             return;
         }
         if (origin == PossessionOrigin.EXISTING && !player.hasPermission(IncarnatePermissions.POSSESS)) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] You do not have permission to possess existing mobs.");
+            rejectBeforeStart(player, vessel, origin, "permission-possess");
             return;
         }
         if (!IncarnatePermissions.canUseMob(player, vesselType)) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] You do not have access to the " + vesselType + " vessel.");
+            rejectBeforeStart(player, vessel, origin, "mob-access-denied", Map.of("entity", Component.text(vesselType.name().toLowerCase(java.util.Locale.ROOT))));
             return;
         }
         if (!player.isOnline() || player.isDead()) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] You cannot start possession in your current state.");
+            rejectBeforeStart(player, vessel, origin, "start-state-invalid");
             return;
         }
         if (player.isInsideVehicle()) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] Leave your current vehicle before possessing a mob.");
+            rejectBeforeStart(player, vessel, origin, "leave-vehicle");
             return;
         }
         if (isPossessing(player) || byPlayer.containsKey(playerId)) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] You are already possessing a vessel.");
+            rejectBeforeStart(player, vessel, origin, "already-possessing");
             return;
         }
         if (restoringPlayers.contains(playerId) || playerRecovery.hasRecovery(player)) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] Your previous vessel release is still being recovered.");
+            rejectBeforeStart(player, vessel, origin, "previous-recovery-pending");
             recoverPlayerIfNeeded(player);
             return;
         }
         if (isExcluded(vessel.getType())) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] This entity type is excluded.");
+            rejectBeforeStart(player, vessel, origin, "entity-excluded");
             return;
         }
         if (byVessel.containsKey(vesselId)) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] That vessel is already controlled.");
+            rejectBeforeStart(player, vessel, origin, "vessel-already-controlled");
             return;
         }
         if (!pendingPlayers.add(playerId)) {
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] A possession request is already starting for you.");
+            rejectBeforeStart(player, vessel, origin, "request-already-starting");
             return;
         }
         if (!pendingVessels.add(vesselId)) {
             pendingPlayers.remove(playerId);
-            rejectBeforeStart(player, vessel, origin, "[Incarnate] That vessel is already being acquired.");
+            rejectBeforeStart(player, vessel, origin, "vessel-already-acquiring");
             return;
         }
 
@@ -175,7 +179,7 @@ public final class PossessionManager {
             clearPending(playerId, vesselId);
             discardCreatedVessel(vessel, origin);
             plugin.getLogger().log(Level.WARNING, "Failed to capture controller state before possession", ex);
-            player.sendMessage(Component.text("[Incarnate] Failed to capture your current state safely."));
+            messages.send(player, "capture-failed");
             return;
         }
 
@@ -184,27 +188,27 @@ public final class PossessionManager {
             boolean committed = false;
             try {
                 if (!vessel.isValid() || vessel.isDead()) {
-                    notifyPlayer(player, "[Incarnate] The vessel is no longer valid.");
+                    notifyPlayer(player, "vessel-invalid");
                     discardCreatedVesselNow(vessel, origin);
                     return;
                 }
                 if (vessel.isInsideVehicle()) {
-                    notifyPlayer(player, "[Incarnate] A mob riding another entity cannot be possessed yet.");
+                    notifyPlayer(player, "vessel-riding");
                     discardCreatedVesselNow(vessel, origin);
                     return;
                 }
                 if (vesselRecovery.isMarked(vessel)) {
                     boolean recovered = vesselRecovery.recoverOrphan(vessel, removeOrphanedCreated);
                     if (recovered && vessel.isValid()) {
-                        notifyPlayer(player, "[Incarnate] This mob was recovered from an interrupted session. Try possessing it again.");
+                        notifyPlayer(player, "vessel-recovered-retry");
                     } else {
-                        notifyPlayer(player, "[Incarnate] This vessel was pending interrupted-session recovery.");
+                        notifyPlayer(player, "vessel-recovery-pending");
                     }
                     return;
                 }
 
                 if (byPlayer.containsKey(playerId) || byVessel.containsKey(vesselId)) {
-                    notifyPlayer(player, "[Incarnate] Possession race was rejected safely.");
+                    notifyPlayer(player, "race-rejected");
                     discardCreatedVesselNow(vessel, origin);
                     return;
                 }
@@ -226,13 +230,13 @@ public final class PossessionManager {
 
                 if (byPlayer.putIfAbsent(playerId, session) != null) {
                     rollbackPreparedVessel(vessel, origin, vesselState);
-                    notifyPlayer(player, "[Incarnate] Possession race was rejected safely.");
+                    notifyPlayer(player, "race-rejected");
                     return;
                 }
                 if (byVessel.putIfAbsent(vesselId, session) != null) {
                     byPlayer.remove(playerId, session);
                     rollbackPreparedVessel(vessel, origin, vesselState);
-                    notifyPlayer(player, "[Incarnate] Possession race was rejected safely.");
+                    notifyPlayer(player, "race-rejected");
                     return;
                 }
 
@@ -249,19 +253,19 @@ public final class PossessionManager {
                 if (session != null && session.vesselId().equals(vesselId)) {
                     requestRelease(session, ReleaseReason.INTERNAL_ERROR);
                 } else {
-                    notifyPlayer(player, "[Incarnate] Possession failed safely due to an internal error.");
+                    notifyPlayer(player, "possession-internal-error");
                 }
             } finally {
                 clearPending(playerId, vesselId);
             }
         }, () -> deferFromRetired(() -> {
             clearPending(playerId, vesselId);
-            notifyPlayer(player, "[Incarnate] The vessel disappeared before possession started.");
+            notifyPlayer(player, "vessel-disappeared");
         }));
 
         if (beginTask == null) {
             clearPending(playerId, vesselId);
-            notifyPlayer(player, "[Incarnate] The vessel disappeared before possession started.");
+            notifyPlayer(player, "vessel-disappeared");
         }
     }
 
@@ -297,7 +301,7 @@ public final class PossessionManager {
         Player player = session.player();
         Location destination = session.lastKnownVesselLocation();
         if (destination == null) {
-            handleMountedCameraFailure(session, "No vessel position was available for the free-look camera.");
+            handleMountedCameraFailure(session, "camera-reason.no-position");
             return;
         }
 
@@ -313,7 +317,7 @@ public final class PossessionManager {
                     return;
                 }
                 if (error != null || !Boolean.TRUE.equals(success)) {
-                    handleMountedCameraFailure(session, "Could not move the controller camera to the vessel safely.");
+                    handleMountedCameraFailure(session, "camera-reason.move-failed");
                     return;
                 }
                 tryMountController(session, 0);
@@ -340,7 +344,7 @@ public final class PossessionManager {
             }
 
             if (player.isInsideVehicle() && player.getVehicle() != vessel) {
-                handleMountedCameraFailure(session, "The controller entered another vehicle while the camera was attaching.");
+                handleMountedCameraFailure(session, "camera-reason.other-vehicle");
                 return;
             }
 
@@ -351,7 +355,7 @@ public final class PossessionManager {
             }
 
             session.cameraTransport(CameraTransport.MOUNTED);
-            sendAcquiredMessage(session, "mounted free-look");
+            sendAcquiredMessage(session, "mounted-free-look");
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
         if (mountTask == null && session.isActive()) {
             requestRelease(session, ReleaseReason.VESSEL_REMOVED);
@@ -360,7 +364,7 @@ public final class PossessionManager {
 
     private void retryMountedCamera(PossessionSession session, int attempt) {
         if (attempt + 1 >= cameraMountRetries) {
-            handleMountedCameraFailure(session, "The controller and vessel could not be joined on a safe entity region.");
+            handleMountedCameraFailure(session, "camera-reason.region-join-failed");
             return;
         }
         Mob vessel = session.vessel();
@@ -370,15 +374,15 @@ public final class PossessionManager {
         }
     }
 
-    private void handleMountedCameraFailure(PossessionSession session, String reason) {
+    private void handleMountedCameraFailure(PossessionSession session, String reasonKey) {
         if (!session.isActive()) {
             return;
         }
         if (cameraFallbackToSpectatorTarget) {
-            notifyPlayer(session.player(), "[Incarnate] Free-look camera fallback: " + reason);
+            notifyPlayer(session.player(), "camera-fallback", Map.of("reason", messages.render(session.player(), reasonKey)));
             attachSpectatorTargetCamera(session, true);
         } else {
-            notifyPlayer(session.player(), "[Incarnate] Could not attach the free-look camera safely.");
+            notifyPlayer(session.player(), "camera-attach-failed");
             requestRelease(session, ReleaseReason.INTERNAL_ERROR);
         }
     }
@@ -397,17 +401,21 @@ public final class PossessionManager {
                 requestRelease(session, ReleaseReason.VESSEL_REMOVED);
                 return;
             }
-            sendAcquiredMessage(session, fallback ? "legacy spectator fallback" : "spectator target");
+            sendAcquiredMessage(session, fallback ? "legacy-spectator-fallback" : "spectator-target");
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
         if (cameraTask == null && session.isActive()) {
             requestRelease(session, ReleaseReason.VESSEL_REMOVED);
         }
     }
 
-    private void sendAcquiredMessage(PossessionSession session, String cameraLabel) {
+    private void sendAcquiredMessage(PossessionSession session, String cameraKey) {
+        Player player = session.player();
         Mob vessel = session.vessel();
-        notifyPlayer(session.player(), "[Incarnate] Vessel acquired. Camera: " + cameraLabel + ". Left-click: "
-            + abilities.primaryLabel(vessel) + ", F: " + abilities.secondaryLabel(vessel) + ", Shift+F: release.");
+        notifyPlayer(player, "acquired", Map.of(
+            "camera", messages.cameraLabel(player, cameraKey),
+            "primary_action", messages.abilityLabel(player, abilities.primaryLabel(vessel)),
+            "secondary_action", messages.abilityLabel(player, abilities.secondaryLabel(vessel))
+        ));
     }
 
     private void startInputSampler(PossessionSession session) {
@@ -498,7 +506,7 @@ public final class PossessionManager {
                 abilities.triggerPrimary(session);
             } catch (Throwable ex) {
                 plugin.getLogger().log(Level.SEVERE, "Primary ability failed for " + vessel.getType() + " " + session.vesselId(), ex);
-                notifyPlayer(player, "[Incarnate] This vessel ability failed; possession was kept active.");
+                notifyPlayer(player, "ability-primary-failed");
             }
         }, null);
         if (abilityTask == null && session.isActive()) {
@@ -521,7 +529,7 @@ public final class PossessionManager {
                 abilities.triggerSecondary(session);
             } catch (Throwable ex) {
                 plugin.getLogger().log(Level.SEVERE, "Secondary ability failed for " + vessel.getType() + " " + session.vesselId(), ex);
-                notifyPlayer(player, "[Incarnate] This vessel secondary ability failed; possession was kept active.");
+                notifyPlayer(player, "ability-secondary-failed");
             }
         }, null);
         if (abilityTask == null && session.isActive()) {
@@ -624,11 +632,11 @@ public final class PossessionManager {
                         restoringPlayers.remove(session.playerId());
                         visibility.reveal(session.playerId(), player);
                         if (reason != ReleaseReason.QUIT && reason != ReleaseReason.PLUGIN_DISABLE) {
-                            player.sendMessage(Component.text("[Incarnate] Released from vessel."));
+                            messages.send(player, "released");
                         }
                     } else {
                         plugin.getLogger().warning("Release teleport failed for " + player.getUniqueId() + "; recovery marker was kept.");
-                        player.sendMessage(Component.text("[Incarnate] Release teleport failed; recovery state was kept for safety."));
+                        messages.send(player, "release-teleport-failed");
                     }
                 }, null);
                 if (clearTask == null) {
@@ -754,10 +762,10 @@ public final class PossessionManager {
             if (error == null && Boolean.TRUE.equals(success)) {
                 restoringPlayers.remove(playerId);
                 visibility.reveal(playerId, player);
-                notifyPlayer(player, "[Incarnate] Recovered from an interrupted possession session.");
+                notifyPlayer(player, "recovered");
             } else {
                 plugin.getLogger().warning("Interrupted possession recovery is still pending for " + playerId + ".");
-                notifyPlayer(player, "[Incarnate] Recovery is still pending; new possession is blocked for safety.");
+                notifyPlayer(player, "recovery-pending");
             }
         });
     }
@@ -857,16 +865,24 @@ public final class PossessionManager {
         }
     }
 
-    private void notifyPlayer(Player player, String message) {
+    private void notifyPlayer(Player player, String key) {
+        notifyPlayer(player, key, Map.of());
+    }
+
+    private void notifyPlayer(Player player, String key, Map<String, Component> placeholders) {
         player.getScheduler().run(plugin, task -> {
             if (player.isOnline()) {
-                player.sendMessage(Component.text(message));
+                messages.send(player, key, placeholders);
             }
         }, null);
     }
 
-    private void rejectBeforeStart(Player player, Mob vessel, PossessionOrigin origin, String message) {
-        player.sendMessage(Component.text(message));
+    private void rejectBeforeStart(Player player, Mob vessel, PossessionOrigin origin, String key) {
+        rejectBeforeStart(player, vessel, origin, key, Map.of());
+    }
+
+    private void rejectBeforeStart(Player player, Mob vessel, PossessionOrigin origin, String key, Map<String, Component> placeholders) {
+        messages.send(player, key, placeholders);
         discardCreatedVessel(vessel, origin);
     }
 
