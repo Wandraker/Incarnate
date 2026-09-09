@@ -6,6 +6,7 @@ import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.ViewSnapshot;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
 import dev.onelsey.incarnate.movement.VesselController;
+import dev.onelsey.incarnate.permission.IncarnatePermissions;
 import dev.onelsey.incarnate.visibility.PossessionVisibilityManager;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
@@ -101,7 +102,20 @@ public final class PossessionManager {
     public void begin(Player player, Mob vessel, PossessionOrigin origin) {
         UUID playerId = player.getUniqueId();
         UUID vesselId = vessel.getUniqueId();
+        EntityType vesselType = vessel.getType();
 
+        if (origin == PossessionOrigin.CREATED && !player.hasPermission(IncarnatePermissions.CREATE)) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] You do not have permission to create vessels.");
+            return;
+        }
+        if (origin == PossessionOrigin.EXISTING && !player.hasPermission(IncarnatePermissions.POSSESS)) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] You do not have permission to possess existing mobs.");
+            return;
+        }
+        if (!IncarnatePermissions.canUseMob(player, vesselType)) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] You do not have access to the " + vesselType + " vessel.");
+            return;
+        }
         if (!player.isOnline() || player.isDead()) {
             rejectBeforeStart(player, vessel, origin, "[Incarnate] You cannot start possession in your current state.");
             return;
