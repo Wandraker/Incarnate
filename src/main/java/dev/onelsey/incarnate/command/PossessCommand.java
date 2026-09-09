@@ -1,5 +1,6 @@
 package dev.onelsey.incarnate.command;
 
+import dev.onelsey.incarnate.permission.IncarnatePermissions;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionOrigin;
 import net.kyori.adventure.text.Component;
@@ -29,6 +30,10 @@ public final class PossessCommand implements CommandExecutor {
             return true;
         }
 
+        if (!player.hasPermission(IncarnatePermissions.POSSESS)) {
+            player.sendMessage(Component.text("[Incarnate] You do not have permission to possess existing mobs."));
+            return true;
+        }
         if (possessions.isPossessing(player)) {
             player.sendMessage(Component.text("[Incarnate] You are already possessing a vessel."));
             return true;
@@ -49,6 +54,10 @@ public final class PossessCommand implements CommandExecutor {
         Entity entity = hit == null ? null : hit.getHitEntity();
         if (!(entity instanceof Mob mob)) {
             player.sendMessage(Component.text("[Incarnate] Look at a mob within " + distance + " blocks."));
+            return true;
+        }
+        if (!IncarnatePermissions.canUseMob(player, mob.getType())) {
+            player.sendMessage(Component.text("[Incarnate] You do not have access to the " + mob.getType() + " vessel."));
             return true;
         }
 
