@@ -29,6 +29,7 @@ public final class PossessionSession {
     private volatile long controlTick;
     private volatile long lastPrimaryAbilityTick = Long.MIN_VALUE;
     private volatile long lastSecondaryAbilityTick = Long.MIN_VALUE;
+    private volatile long movementControlLockedUntilTick = Long.MIN_VALUE;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
 
     public PossessionSession(
@@ -106,6 +107,17 @@ public final class PossessionSession {
         }
         lastSecondaryAbilityTick = now;
         return true;
+    }
+
+    public void lockMovementControl(int ticks) {
+        long until = controlTick + Math.max(1, ticks);
+        if (movementControlLockedUntilTick == Long.MIN_VALUE || until > movementControlLockedUntilTick) {
+            movementControlLockedUntilTick = until;
+        }
+    }
+
+    public boolean isMovementControlLocked() {
+        return movementControlLockedUntilTick != Long.MIN_VALUE && controlTick < movementControlLockedUntilTick;
     }
 
     public void markSpectatorShiftAttempt() {
