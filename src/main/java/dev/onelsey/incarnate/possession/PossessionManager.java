@@ -1,0 +1,647 @@
+package dev.onelsey.incarnate.possession;
+
+import dev.onelsey.incarnate.IncarnatePlugin;
+import dev.onelsey.incarnate.ability.AbilityRegistry;
+import dev.onelsey.incarnate.input.InputSnapshot;
+import dev.onelsey.incarnate.input.ViewSnapshot;
+import dev.onelsey.incarnate.movement.ControllerRegistry;
+import dev.onelsey.incarnate.movement.VesselController;
+import dev.onelsey.incarnate.visibility.PossessionVisibilityManager;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import net.kyori.adventure.text.Component;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Mob;
+import org.bukkit.entity.Player;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+
+public final class PossessionManager {
+    private final IncarnatePlugin plugin;
+    private final ControllerRegistry controllers;
+    private final AbilityRegistry abilities;
+    private final PossessionVisibilityManager visibility;
+    private final Map<UUID, PossessionSession> byPlayer = new ConcurrentHashMap<>();
+    private final Map<UUID, PossessionSession> byVessel = new ConcurrentHashMap<>();
+    private final Set<UUID> pendingPlayers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> pendingVessels = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> restoringPlayers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> recoveryInFlight = ConcurrentHashMap.newKeySet();
+    private final Set<EntityType> excluded;
+    private final boolean removeCreatedOnRelease;
+    private final boolean removeOrphanedCreated;
+    private final boolean releaseAtVessel;
+    private final PlayerRecoveryStore playerRecovery;
+    private final VesselRecoveryStore vesselRecovery;
+
+    public PossessionManager(
+        IncarnatePlugin plugin,
+        ControllerRegistry controllers,
+        AbilityRegistry abilities,
+        PossessionVisibilityManager visibility,
+        Set<EntityType> excluded
+    ) {
+        this.plugin = plugin;
+        this.controllers = controllers;
+        this.abilities = abilities;
+        this.visibility = visibility;
+        this.excluded = Set.copyOf(excluded);
+        this.removeCreatedOnRelease = plugin.getConfig().getBoolean("created-vessels.remove-on-release", true);
+        this.removeOrphanedCreated = plugin.getConfig().getBoolean("created-vessels.remove-orphaned-after-recovery", true);
+        this.releaseAtVessel = plugin.getConfig().getBoolean("control.release-at-vessel", true);
+        this.playerRecovery = new PlayerRecoveryStore(plugin);
+        this.vesselRecovery = new VesselRecoveryStore(plugin);
+    }
+
+    public PossessionSession session(Player player) {
+        return byPlayer.get(player.getUniqueId());
+    }
+
+    public PossessionSession session(Mob vessel) {
+        return byVessel.get(vessel.getUniqueId());
+    }
+
+    public boolean isPossessing(Player player) {
+        return session(player) != null;
+    }
+
+    public boolean isRecoveryPending(Player player) {
+        UUID playerId = player.getUniqueId();
+        return restoringPlayers.contains(playerId) || playerRecovery.hasRecovery(player);
+    }
+
+    public void recoverPending(Player player) {
+        recoverPlayerIfNeeded(player);
+    }
+
+    public boolean isControllerConcealed(UUID playerId) {
+        return visibility.isConcealed(playerId);
+    }
+
+    public boolean isExcluded(EntityType type) {
+        return excluded.contains(type);
+    }
+
+    public boolean canCreate(EntityType type) {
+        if (isExcluded(type) || !type.isAlive() || !type.isSpawnable()) {
+            return false;
+        }
+        Class<? extends Entity> entityClass = type.getEntityClass();
+        return entityClass != null && Mob.class.isAssignableFrom(entityClass);
+    }
+
+    public void begin(Player player, Mob vessel, PossessionOrigin origin) {
+        UUID playerId = player.getUniqueId();
+        UUID vesselId = vessel.getUniqueId();
+
+        if (!player.isOnline() || player.isDead()) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] You cannot start possession in your current state.");
+            return;
+        }
+        if (player.isInsideVehicle()) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] Leave your current vehicle before possessing a mob.");
+            return;
+        }
+        if (isPossessing(player) || byPlayer.containsKey(playerId)) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] You are already possessing a vessel.");
+            return;
+        }
+        if (restoringPlayers.contains(playerId) || playerRecovery.hasRecovery(player)) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] Your previous vessel release is still being recovered.");
+            recoverPlayerIfNeeded(player);
+            return;
+        }
+        if (isExcluded(vessel.getType())) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] This entity type is excluded.");
+            return;
+        }
+        if (byVessel.containsKey(vesselId)) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] That vessel is already controlled.");
+            return;
+        }
+        if (!pendingPlayers.add(playerId)) {
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] A possession request is already starting for you.");
+            return;
+        }
+        if (!pendingVessels.add(vesselId)) {
+            pendingPlayers.remove(playerId);
+            rejectBeforeStart(player, vessel, origin, "[Incarnate] That vessel is already being acquired.");
+            return;
+        }
+
+        final PlayerState playerState;
+        final InputSnapshot initialInput;
+        final ViewSnapshot initialView;
+        try {
+            playerState = PlayerState.capture(player);
+            initialInput = InputSnapshot.from(player.getCurrentInput());
+            initialView = new ViewSnapshot(player.getYaw(), player.getPitch());
+        } catch (RuntimeException ex) {
+            clearPending(playerId, vesselId);
+            discardCreatedVessel(vessel, origin);
+            plugin.getLogger().log(Level.WARNING, "Failed to capture controller state before possession", ex);
+            player.sendMessage(Component.text("[Incarnate] Failed to capture your current state safely."));
+            return;
+        }
+
+        ScheduledTask beginTask = vessel.getScheduler().run(plugin, task -> {
+            VesselState vesselState = null;
+            boolean committed = false;
+            try {
+                if (!vessel.isValid() || vessel.isDead()) {
+                    notifyPlayer(player, "[Incarnate] The vessel is no longer valid.");
+                    discardCreatedVesselNow(vessel, origin);
+                    return;
+                }
+                if (vessel.isInsideVehicle()) {
+                    notifyPlayer(player, "[Incarnate] A mob riding another entity cannot be possessed yet.");
+                    discardCreatedVesselNow(vessel, origin);
+                    return;
+                }
+
+                if (byPlayer.containsKey(playerId) || byVessel.containsKey(vesselId)) {
+                    notifyPlayer(player, "[Incarnate] Possession race was rejected safely.");
+                    discardCreatedVesselNow(vessel, origin);
+                    return;
+                }
+
+                vesselState = VesselState.capture(vessel);
+                vesselRecovery.save(vessel, origin, vesselState);
+                vesselState.applyPossessionState(vessel);
+
+                PossessionSession session = new PossessionSession(
+                    playerId,
+                    player,
+                    vessel,
+                    origin,
+                    playerState,
+                    vesselState,
+                    initialInput,
+                    initialView
+                );
+
+                if (byPlayer.putIfAbsent(playerId, session) != null) {
+                    rollbackPreparedVessel(vessel, origin, vesselState);
+                    notifyPlayer(player, "[Incarnate] Possession race was rejected safely.");
+                    return;
+                }
+                if (byVessel.putIfAbsent(vesselId, session) != null) {
+                    byPlayer.remove(playerId, session);
+                    rollbackPreparedVessel(vessel, origin, vesselState);
+                    notifyPlayer(player, "[Incarnate] Possession race was rejected safely.");
+                    return;
+                }
+
+                committed = true;
+                visibility.conceal(playerId, player);
+                startControlLoop(session);
+                attachPlayerCamera(session);
+            } catch (Throwable ex) {
+                plugin.getLogger().log(Level.SEVERE, "Failed while starting possession for vessel " + vesselId, ex);
+                if (!committed && vesselState != null) {
+                    rollbackPreparedVessel(vessel, origin, vesselState);
+                }
+                PossessionSession session = byPlayer.get(playerId);
+                if (session != null && session.vesselId().equals(vesselId)) {
+                    requestRelease(session, ReleaseReason.INTERNAL_ERROR);
+                } else {
+                    notifyPlayer(player, "[Incarnate] Possession failed safely due to an internal error.");
+                }
+            } finally {
+                clearPending(playerId, vesselId);
+            }
+        }, () -> deferFromRetired(() -> {
+            clearPending(playerId, vesselId);
+            notifyPlayer(player, "[Incarnate] The vessel disappeared before possession started.");
+        }));
+
+        if (beginTask == null) {
+            clearPending(playerId, vesselId);
+            notifyPlayer(player, "[Incarnate] The vessel disappeared before possession started.");
+        }
+    }
+
+    private void attachPlayerCamera(PossessionSession session) {
+        Player player = session.player();
+        Mob vessel = session.vessel();
+
+        ScheduledTask attachTask = player.getScheduler().run(plugin, task -> {
+            if (!session.isActive() || !player.isOnline()) {
+                requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+                return;
+            }
+
+            playerRecovery.save(player, session.playerState());
+            startInputSampler(session);
+            player.setGameMode(GameMode.SPECTATOR);
+            try {
+                player.setSpectatorTarget(vessel);
+            } catch (IllegalStateException ex) {
+                requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+                return;
+            }
+
+            player.sendMessage(Component.text("[Incarnate] Vessel acquired. Shift+F or /release to leave it."));
+        }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
+        if (attachTask == null) {
+            requestRelease(session, ReleaseReason.QUIT);
+        }
+    }
+
+    private void startInputSampler(PossessionSession session) {
+        Player player = session.player();
+        ScheduledTask inputTask = player.getScheduler().runAtFixedRate(plugin, task -> {
+            if (!session.isActive() || !player.isOnline()) {
+                task.cancel();
+                return;
+            }
+            session.input(InputSnapshot.from(player.getCurrentInput()));
+            session.view(new ViewSnapshot(player.getYaw(), player.getPitch()));
+        }, null, 1L, 1L);
+        session.inputSamplerTask(inputTask);
+        if (inputTask == null) {
+            requestRelease(session, ReleaseReason.QUIT);
+        }
+    }
+
+    private void startControlLoop(PossessionSession session) {
+        Mob vessel = session.vessel();
+        VesselController controller = controllers.controllerFor(vessel);
+
+        ScheduledTask controlTask = vessel.getScheduler().runAtFixedRate(plugin, task -> {
+            if (!session.isActive()) {
+                task.cancel();
+                return;
+            }
+            if (!vessel.isValid() || vessel.isDead()) {
+                task.cancel();
+                requestRelease(session, vessel.isDead() ? ReleaseReason.VESSEL_DIED : ReleaseReason.VESSEL_REMOVED);
+                return;
+            }
+
+            session.advanceControlTick();
+            try {
+                controller.tick(session, vessel);
+            } catch (Throwable ex) {
+                task.cancel();
+                plugin.getLogger().log(Level.SEVERE, "Movement controller failed for " + vessel.getType() + " " + session.vesselId(), ex);
+                requestRelease(session, ReleaseReason.INTERNAL_ERROR);
+            }
+        }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)), 1L, 1L);
+
+        session.controlTask(controlTask);
+        if (controlTask == null) {
+            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+        }
+    }
+
+    public void updateInput(Player player, InputSnapshot input) {
+        PossessionSession session = session(player);
+        if (session != null && session.isActive()) {
+            session.input(input);
+        }
+    }
+
+    public void updateView(Player player, float yaw, float pitch) {
+        PossessionSession session = session(player);
+        if (session != null && session.isActive()) {
+            session.view(new ViewSnapshot(yaw, pitch));
+        }
+    }
+
+    public void triggerPrimary(Player player) {
+        PossessionSession session = session(player);
+        if (session == null || !session.isActive()) {
+            return;
+        }
+
+        Mob vessel = session.vessel();
+        ScheduledTask abilityTask = vessel.getScheduler().run(plugin, task -> {
+            if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
+                return;
+            }
+            try {
+                abilities.triggerPrimary(session);
+            } catch (Throwable ex) {
+                plugin.getLogger().log(Level.SEVERE, "Primary ability failed for " + vessel.getType() + " " + session.vesselId(), ex);
+                notifyPlayer(player, "[Incarnate] This vessel ability failed; possession was kept active.");
+            }
+        }, null);
+        if (abilityTask == null && session.isActive()) {
+            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+        }
+    }
+
+    public void requestRelease(Player player, ReleaseReason reason) {
+        PossessionSession session = session(player);
+        if (session != null) {
+            requestRelease(session, reason);
+        }
+    }
+
+    public void requestRelease(PossessionSession session, ReleaseReason reason) {
+        if (!session.deactivate()) {
+            return;
+        }
+
+        restoringPlayers.add(session.playerId());
+        byPlayer.remove(session.playerId(), session);
+        byVessel.remove(session.vesselId(), session);
+        cancelTasks(session);
+
+        Mob vessel = session.vessel();
+        ScheduledTask releaseTask = vessel.getScheduler().run(plugin, ignored -> {
+            Location exit = vessel.isValid() ? findExitLocation(vessel) : session.lastKnownVesselLocation();
+
+            if (session.origin() == PossessionOrigin.CREATED && removeCreatedOnRelease && vessel.isValid()) {
+                vesselRecovery.clear(vessel);
+                vessel.remove();
+            } else if (vessel.isValid()) {
+                if (!vessel.isDead()) {
+                    session.vesselState().restore(vessel);
+                }
+                vesselRecovery.clear(vessel);
+            }
+
+            restorePlayer(session, reason, exit);
+        }, () -> deferFromRetired(() -> restorePlayer(session, reason, session.lastKnownVesselLocation())));
+        if (releaseTask == null) {
+            restorePlayer(session, reason, session.lastKnownVesselLocation());
+        }
+    }
+
+    private void cancelTasks(PossessionSession session) {
+        ScheduledTask control = session.controlTask();
+        if (control != null) {
+            control.cancel();
+        }
+        ScheduledTask input = session.inputSamplerTask();
+        if (input != null) {
+            input.cancel();
+        }
+    }
+
+    private void restorePlayer(PossessionSession session, ReleaseReason reason, Location vesselLocation) {
+        Player player = session.player();
+        ScheduledTask restoreTask = player.getScheduler().run(plugin, task -> {
+            if (!player.isOnline()) {
+                return;
+            }
+
+            if (player.getGameMode() == GameMode.SPECTATOR) {
+                try {
+                    player.setSpectatorTarget(null);
+                } catch (IllegalStateException ignored) {
+                }
+            }
+
+            restorePlayerState(player, session.playerState());
+            visibility.reveal(session.playerId(), player);
+
+            Location destination = releaseAtVessel && vesselLocation != null ? vesselLocation : session.playerState().location();
+            player.teleportAsync(destination).whenComplete((success, error) -> {
+                ScheduledTask clearTask = player.getScheduler().run(plugin, ignored -> {
+                    if (!player.isOnline()) {
+                        return;
+                    }
+                    if (error == null && Boolean.TRUE.equals(success)) {
+                        playerRecovery.clear(player);
+                        restoringPlayers.remove(session.playerId());
+                    } else {
+                        plugin.getLogger().warning("Release teleport failed for " + player.getUniqueId() + "; recovery marker was kept.");
+                        player.sendMessage(Component.text("[Incarnate] Release teleport failed; recovery state was kept for safety."));
+                    }
+                }, null);
+                if (clearTask == null) {
+                }
+            });
+
+            if (reason != ReleaseReason.QUIT && reason != ReleaseReason.PLUGIN_DISABLE) {
+                player.sendMessage(Component.text("[Incarnate] Released from vessel."));
+            }
+        }, null);
+        if (restoreTask == null) {
+            visibility.forget(session.playerId());
+        }
+    }
+
+    private static void restorePlayerState(Player player, PlayerState state) {
+        player.setGameMode(state.gameMode());
+        player.setAllowFlight(state.allowFlight());
+        player.setFlySpeed(state.flySpeed());
+        if (state.allowFlight()) {
+            player.setFlying(state.flying());
+        }
+    }
+
+    public void releaseOnQuit(Player player) {
+        PossessionSession session = session(player);
+        if (session == null || !session.deactivate()) {
+            return;
+        }
+
+        restoringPlayers.add(session.playerId());
+        byPlayer.remove(session.playerId(), session);
+        byVessel.remove(session.vesselId(), session);
+        visibility.forget(session.playerId());
+        cancelTasks(session);
+
+        if (player.getGameMode() == GameMode.SPECTATOR) {
+            try {
+                player.setSpectatorTarget(null);
+            } catch (IllegalStateException ignored) {
+            }
+        }
+        restorePlayerState(player, session.playerState());
+
+        Mob vessel = session.vessel();
+        vessel.getScheduler().run(plugin, ignored -> {
+            if (session.origin() == PossessionOrigin.CREATED && removeCreatedOnRelease && vessel.isValid()) {
+                vesselRecovery.clear(vessel);
+                vessel.remove();
+            } else if (vessel.isValid()) {
+                if (!vessel.isDead()) {
+                    session.vesselState().restore(vessel);
+                }
+                vesselRecovery.clear(vessel);
+            }
+        }, null);
+    }
+
+    public void releaseOnControllerDeath(Player player) {
+        PossessionSession session = session(player);
+        if (session == null || !session.deactivate()) {
+            return;
+        }
+
+        restoringPlayers.add(session.playerId());
+        byPlayer.remove(session.playerId(), session);
+        byVessel.remove(session.vesselId(), session);
+        visibility.forget(session.playerId());
+        cancelTasks(session);
+
+        Mob vessel = session.vessel();
+        vessel.getScheduler().run(plugin, ignored -> {
+            if (session.origin() == PossessionOrigin.CREATED && removeCreatedOnRelease && vessel.isValid()) {
+                vesselRecovery.clear(vessel);
+                vessel.remove();
+            } else if (vessel.isValid()) {
+                if (!vessel.isDead()) {
+                    session.vesselState().restore(vessel);
+                }
+                vesselRecovery.clear(vessel);
+            }
+        }, null);
+    }
+
+    public void onPlayerRespawn(Player player) {
+        if (!restoringPlayers.contains(player.getUniqueId()) && !playerRecovery.hasRecovery(player)) {
+            return;
+        }
+        player.getScheduler().runDelayed(plugin, task -> {
+            recoverPlayerIfNeeded(player);
+            visibility.reveal(player.getUniqueId(), player);
+        }, null, 1L);
+    }
+
+    public void onPlayerJoin(Player player) {
+        visibility.applyToJoiningViewer(player);
+        if (playerRecovery.hasRecovery(player)) {
+            restoringPlayers.add(player.getUniqueId());
+        }
+        player.getScheduler().run(plugin, task -> {
+            recoverPlayerIfNeeded(player);
+            visibility.reveal(player.getUniqueId(), player);
+        }, null);
+    }
+
+    public void recoverPlayerIfNeeded(Player player) {
+        UUID playerId = player.getUniqueId();
+        if (!playerRecovery.hasRecovery(player)) {
+            restoringPlayers.remove(playerId);
+            recoveryInFlight.remove(playerId);
+            return;
+        }
+
+        restoringPlayers.add(playerId);
+        if (!recoveryInFlight.add(playerId)) {
+            return;
+        }
+
+        playerRecovery.recover(player).whenComplete((success, error) -> {
+            recoveryInFlight.remove(playerId);
+            if (error == null && Boolean.TRUE.equals(success)) {
+                restoringPlayers.remove(playerId);
+                notifyPlayer(player, "[Incarnate] Recovered from an interrupted possession session.");
+            } else {
+                plugin.getLogger().warning("Interrupted possession recovery is still pending for " + playerId + ".");
+                notifyPlayer(player, "[Incarnate] Recovery is still pending; new possession is blocked for safety.");
+            }
+        });
+    }
+
+    public void recoverOrphanVessel(Mob mob) {
+        if (byVessel.containsKey(mob.getUniqueId()) || !vesselRecovery.isMarked(mob)) {
+            return;
+        }
+        mob.getScheduler().run(plugin, task -> {
+            if (!byVessel.containsKey(mob.getUniqueId()) && vesselRecovery.recoverOrphan(mob, removeOrphanedCreated)) {
+                plugin.getLogger().warning("Recovered orphaned Incarnate vessel " + mob.getUniqueId() + " (" + mob.getType() + ").");
+            }
+        }, null);
+    }
+
+    public void recoverAlreadyOnlinePlayers() {
+        plugin.getServer().getGlobalRegionScheduler().execute(plugin, () -> {
+            for (Player player : plugin.getServer().getOnlinePlayers()) {
+                player.getScheduler().run(plugin, task -> recoverPlayerIfNeeded(player), null);
+            }
+        });
+    }
+
+    public void shutdown() {
+        for (PossessionSession session : List.copyOf(byPlayer.values())) {
+            requestRelease(session, ReleaseReason.PLUGIN_DISABLE);
+        }
+        pendingPlayers.clear();
+        pendingVessels.clear();
+    }
+
+    private void deferFromRetired(Runnable action) {
+        try {
+            plugin.getServer().getGlobalRegionScheduler().execute(plugin, action);
+        } catch (RuntimeException ex) {
+            plugin.getLogger().log(Level.FINE, "Could not defer retired-entity recovery task", ex);
+        }
+    }
+
+    private void notifyPlayer(Player player, String message) {
+        player.getScheduler().run(plugin, task -> {
+            if (player.isOnline()) {
+                player.sendMessage(Component.text(message));
+            }
+        }, null);
+    }
+
+    private void rejectBeforeStart(Player player, Mob vessel, PossessionOrigin origin, String message) {
+        player.sendMessage(Component.text(message));
+        discardCreatedVessel(vessel, origin);
+    }
+
+    private void discardCreatedVessel(Mob vessel, PossessionOrigin origin) {
+        if (origin != PossessionOrigin.CREATED) {
+            return;
+        }
+        ScheduledTask task = vessel.getScheduler().run(plugin, ignored -> discardCreatedVesselNow(vessel, origin), null);
+        if (task == null) {
+        }
+    }
+
+    private void discardCreatedVesselNow(Mob vessel, PossessionOrigin origin) {
+        if (origin == PossessionOrigin.CREATED && vessel.isValid()) {
+            vesselRecovery.clear(vessel);
+            vessel.remove();
+        }
+    }
+
+    private void rollbackPreparedVessel(Mob vessel, PossessionOrigin origin, VesselState state) {
+        if (origin == PossessionOrigin.CREATED) {
+            discardCreatedVesselNow(vessel, origin);
+            return;
+        }
+        if (vessel.isValid() && !vessel.isDead()) {
+            state.restore(vessel);
+        }
+        vesselRecovery.clear(vessel);
+    }
+
+    private void clearPending(UUID playerId, UUID vesselId) {
+        pendingPlayers.remove(playerId);
+        pendingVessels.remove(vesselId);
+    }
+
+    private static Location findExitLocation(Mob vessel) {
+        Location base = vessel.getLocation().clone();
+        double[][] offsets = {
+            {1.25, 0.0}, {-1.25, 0.0}, {0.0, 1.25}, {0.0, -1.25},
+            {0.9, 0.9}, {-0.9, 0.9}, {0.9, -0.9}, {-0.9, -0.9}
+        };
+
+        for (double[] offset : offsets) {
+            Location candidate = base.clone().add(offset[0], 0.0, offset[1]);
+            if (candidate.getBlock().isPassable() && candidate.clone().add(0.0, 1.0, 0.0).getBlock().isPassable()) {
+                candidate.setYaw(base.getYaw());
+                candidate.setPitch(base.getPitch());
+                return candidate;
+            }
+        }
+        return base.add(0.0, Math.max(0.25, vessel.getHeight() * 0.15), 0.0);
+    }
+}
