@@ -99,7 +99,22 @@ public final class PlayerRecoveryStore {
         boolean allowFlight = readBool(data, allowFlightKey, false);
         boolean flying = readBool(data, flyingKey, false);
         Float flySpeed = data.get(flySpeedKey, PersistentDataType.FLOAT);
+        String rawWorld = data.get(worldKey, PersistentDataType.STRING);
+        Double x = data.get(xKey, PersistentDataType.DOUBLE);
+        Double y = data.get(yKey, PersistentDataType.DOUBLE);
+        Double z = data.get(zKey, PersistentDataType.DOUBLE);
         Location location = savedLocation(player);
+
+        if (location == null && rawWorld != null && x != null && y != null && z != null) {
+            try {
+                UUID worldId = UUID.fromString(rawWorld);
+                if (Bukkit.getWorld(worldId) == null) {
+                    plugin.getLogger().warning("Recovery world " + worldId + " is not currently loaded for " + player.getUniqueId() + "; recovery marker was kept.");
+                    return CompletableFuture.completedFuture(false);
+                }
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
 
         try {
             player.setSpectatorTarget(null);
@@ -119,11 +134,10 @@ public final class PlayerRecoveryStore {
         if (flySpeed != null && flySpeed >= -1.0f && flySpeed <= 1.0f) {
             player.setFlySpeed(flySpeed);
         }
-        if (allowFlight) {
-            player.setFlying(flying);
-        }
+        player.setFlying(allowFlight && flying);
 
         if (location == null) {
+            plugin.getLogger().warning("Recovery location data was missing or invalid for " + player.getUniqueId() + "; restored player state in place and cleared the stale marker.");
             clear(player);
             return CompletableFuture.completedFuture(true);
         }
