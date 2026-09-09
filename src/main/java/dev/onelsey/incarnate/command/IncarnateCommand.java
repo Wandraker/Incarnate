@@ -4,6 +4,7 @@ import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionOrigin;
 import dev.onelsey.incarnate.possession.PossessionSession;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Registry;
@@ -114,7 +115,7 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
             FluidCollisionMode.NEVER,
             true,
             0.35,
-            entity -> entity instanceof Mob
+            entity -> Bukkit.isOwnedByCurrentRegion(entity) && entity instanceof Mob
         );
         Entity entity = hit == null ? null : hit.getHitEntity();
         if (!(entity instanceof Mob mob)) {
