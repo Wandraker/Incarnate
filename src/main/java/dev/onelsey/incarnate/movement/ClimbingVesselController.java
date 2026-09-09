@@ -19,6 +19,9 @@ public final class ClimbingVesselController extends GroundVesselController {
     @Override
     public void tick(PossessionSession session, Mob vessel) {
         super.tick(session, vessel);
+        if (session.isMovementControlLocked()) {
+            return;
+        }
         if (session.input().forwardAxis() <= 0.0 && !session.input().jump()) {
             return;
         }
