@@ -1,0 +1,33 @@
+name: Apply central permission gate
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+
+      - name: Apply central permission gate
+        run: python3 tools/apply_permission_gate.py
+
+      - name: Commit central permission gate
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'Onelsey'
+          git config user.email '103017546+Wandraker@users.noreply.github.com'
+          git add src/main/java/dev/onelsey/incarnate/possession/PossessionManager.java
+          git commit -m 'Enforce permissions in possession core [skip ci]'
+          git push
