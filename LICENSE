@@ -1,0 +1,85 @@
+Incarnate All Rights Reserved License v1.0
+
+Copyright (c) 2026 Onelsey. All rights reserved.
+
+This software, including its source code, binaries, assets, documentation, and other project materials (collectively, the "Software"), is proprietary software. It is not open-source software.
+
+1. PERMITTED USE
+
+You may:
+
+- download and use official Incarnate releases on Minecraft servers, including private, public, and monetized servers;
+- make reasonable backup copies for your own use;
+- inspect source code that the copyright holder has intentionally made available;
+- configure the Software through its normal configuration files and supported runtime settings;
+- redistribute or share an Official Release, publicly or privately, provided that the release package is complete, unmodified, free of charge, and still contains this license and the original copyright/attribution notices.
+
+For this license, an "Official Release" means a package published or explicitly approved by Onelsey through an official Incarnate distribution channel, such as the project's GitHub Releases page.
+
+2. REDISTRIBUTION OF OFFICIAL RELEASES
+
+You may mirror, upload, send, archive, or otherwise share an exact, unmodified Official Release package.
+
+When redistributing an Official Release, you may not:
+
+- modify, patch, repackage, strip, inject, or replace any file in the release;
+- remove this license, copyright notices, authorship, version information, or other attribution;
+- present yourself or another person as the author, owner, or official distributor of Incarnate;
+- charge money specifically for the Software itself, sell licenses to it, or resell it as a product;
+- bundle a modified build while presenting it as an official Incarnate release.
+
+Charging for hosting, server access, administration, or other services that merely use an unmodified Official Release is allowed.
+
+3. NO FORKS OR DERIVATIVE VERSIONS
+
+Except where an applicable platform's mandatory terms expressly provide a narrow technical right to create a platform-level copy, you may not create, maintain, publish, distribute, or promote a fork or derivative version of the Software without prior written permission from Onelsey.
+
+You may not:
+
+- modify the source code and publish or distribute the modified result;
+- compile or distribute a modified build;
+- port, rebrand, rename, or republish the Software as another project;
+- copy substantial portions of the source code into another project;
+- create a competing or substitute project by copying, translating, adapting, or otherwise deriving implementation code from Incarnate;
+- remove or bypass license, attribution, authorship, or project-identity information;
+- redistribute individual source files or a repackaged source tree outside an exact Official Release package.
+
+If the Incarnate repository is made public on GitHub, GitHub's Terms of Service may permit users to view and create a GitHub-hosted fork through GitHub's own functionality. That platform permission does not grant permission to modify the Software, publish derivative builds, redistribute modified versions, rebrand the project, or otherwise exercise rights not expressly granted by this license.
+
+4. REVERSE ENGINEERING AND EXTRACTION
+
+Except to the extent that applicable law expressly requires otherwise, you may not reverse engineer, decompile, disassemble, defeat technical protections of, or extract substantial implementation code from distributed binaries for the purpose of creating, modifying, or distributing a derivative work.
+
+Ordinary debugging, compatibility diagnosis, security review, and inspection of source code intentionally published by the copyright holder are allowed, provided that no prohibited derivative or redistributed version is created.
+
+5. CONTRIBUTIONS
+
+No right to submit, merge, or redistribute modifications is granted by this license.
+
+Any contribution accepted into the official Incarnate repository may be subject to separate contribution terms or an explicit grant agreed with Onelsey. Acceptance of a contribution does not grant the contributor ownership of the Incarnate project as a whole.
+
+6. NAME AND BRANDING
+
+"Incarnate", its project identity, logos, and related branding are not licensed for use as the name or branding of another plugin, fork, modified build, service, or product.
+
+You may use the name "Incarnate" only as reasonably necessary to identify an authentic, unmodified Official Release or to state that your server uses Incarnate.
+
+7. OWNERSHIP
+
+The Software remains the exclusive property of its respective copyright holder(s). No ownership rights are transferred under this license. All rights not expressly granted are reserved.
+
+8. TERMINATION
+
+The permissions granted by this license terminate automatically if you violate its terms. Upon termination, you must stop distributing the Software and stop using any unauthorized modified, forked, rebranded, or derivative version.
+
+9. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, RELIABILITY, OR AVAILABILITY.
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, DATA LOSS, SERVER DAMAGE, LOST PROFITS, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+
+10. ADDITIONAL PERMISSION
+
+Any permission not granted by this license requires prior written permission from Onelsey.
+
+Copyright (c) 2026 Onelsey. All rights reserved.
