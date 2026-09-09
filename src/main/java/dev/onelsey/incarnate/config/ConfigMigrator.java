@@ -44,7 +44,7 @@ public final class ConfigMigrator {
         plugin.reloadConfig();
     }
 
-    private static boolean mergeMissing(YamlConfiguration target, YamlConfiguration defaults) {
+    static boolean mergeMissing(YamlConfiguration target, YamlConfiguration defaults) {
         boolean changed = false;
         for (String path : defaults.getKeys(true)) {
             if (defaults.isConfigurationSection(path) || target.contains(path)) {
