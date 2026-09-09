@@ -40,6 +40,9 @@ public final class PossessionManager {
     private final boolean removeCreatedOnRelease;
     private final boolean removeOrphanedCreated;
     private final boolean releaseAtVessel;
+    private final CameraTransport cameraMode;
+    private final int cameraMountRetries;
+    private final boolean cameraFallbackToSpectatorTarget;
     private final PlayerRecoveryStore playerRecovery;
     private final VesselRecoveryStore vesselRecovery;
 
@@ -58,6 +61,16 @@ public final class PossessionManager {
         this.removeCreatedOnRelease = plugin.getConfig().getBoolean("created-vessels.remove-on-release", true);
         this.removeOrphanedCreated = plugin.getConfig().getBoolean("created-vessels.remove-orphaned-after-recovery", true);
         this.releaseAtVessel = plugin.getConfig().getBoolean("control.release-at-vessel", true);
+        CameraTransport configuredCamera;
+        try {
+            configuredCamera = CameraTransport.valueOf(plugin.getConfig().getString("camera.mode", "MOUNTED").toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            plugin.getLogger().warning("Unknown camera.mode; using MOUNTED.");
+            configuredCamera = CameraTransport.MOUNTED;
+        }
+        this.cameraMode = configuredCamera == CameraTransport.NONE ? CameraTransport.MOUNTED : configuredCamera;
+        this.cameraMountRetries = Math.max(1, plugin.getConfig().getInt("camera.mount-retries", 8));
+        this.cameraFallbackToSpectatorTarget = plugin.getConfig().getBoolean("camera.fallback-to-spectator-target", true);
         this.playerRecovery = new PlayerRecoveryStore(plugin);
         this.vesselRecovery = new VesselRecoveryStore(plugin);
     }
@@ -254,7 +267,6 @@ public final class PossessionManager {
 
     private void attachPlayerCamera(PossessionSession session) {
         Player player = session.player();
-        Mob vessel = session.vessel();
 
         ScheduledTask attachTask = player.getScheduler().run(plugin, task -> {
             if (!session.isActive() || !player.isOnline()) {
@@ -266,17 +278,136 @@ public final class PossessionManager {
             startInputSampler(session);
             player.setGameMode(GameMode.SPECTATOR);
             try {
+                player.setSpectatorTarget(null);
+            } catch (IllegalStateException ignored) {
+            }
+
+            if (cameraMode == CameraTransport.SPECTATOR_TARGET) {
+                attachSpectatorTargetCamera(session, false);
+            } else {
+                attachMountedCamera(session);
+            }
+        }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
+        if (attachTask == null) {
+            requestRelease(session, ReleaseReason.QUIT);
+        }
+    }
+
+    private void attachMountedCamera(PossessionSession session) {
+        Player player = session.player();
+        Location destination = session.lastKnownVesselLocation();
+        if (destination == null) {
+            handleMountedCameraFailure(session, "No vessel position was available for the free-look camera.");
+            return;
+        }
+
+        ViewSnapshot view = session.view();
+        destination.setYaw(view.yaw());
+        destination.setPitch(view.pitch());
+        session.cameraTeleportInProgress(true);
+
+        player.teleportAsync(destination).whenComplete((success, error) -> {
+            ScheduledTask settleTask = player.getScheduler().run(plugin, task -> {
+                session.cameraTeleportInProgress(false);
+                if (!session.isActive() || !player.isOnline()) {
+                    return;
+                }
+                if (error != null || !Boolean.TRUE.equals(success)) {
+                    handleMountedCameraFailure(session, "Could not move the controller camera to the vessel safely.");
+                    return;
+                }
+                tryMountController(session, 0);
+            }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
+            if (settleTask == null && session.isActive()) {
+                session.cameraTeleportInProgress(false);
+                requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+            }
+        });
+    }
+
+    private void tryMountController(PossessionSession session, int attempt) {
+        Mob vessel = session.vessel();
+        Player player = session.player();
+        ScheduledTask mountTask = vessel.getScheduler().run(plugin, task -> {
+            if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
+                requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+                return;
+            }
+
+            if (!Bukkit.isOwnedByCurrentRegion(player)) {
+                retryMountedCamera(session, attempt);
+                return;
+            }
+
+            if (player.isInsideVehicle() && player.getVehicle() != vessel) {
+                handleMountedCameraFailure(session, "The controller entered another vehicle while the camera was attaching.");
+                return;
+            }
+
+            boolean mounted = player.getVehicle() == vessel || vessel.addPassenger(player);
+            if (!mounted) {
+                retryMountedCamera(session, attempt);
+                return;
+            }
+
+            session.cameraTransport(CameraTransport.MOUNTED);
+            sendAcquiredMessage(session, "mounted free-look");
+        }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
+        if (mountTask == null && session.isActive()) {
+            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+        }
+    }
+
+    private void retryMountedCamera(PossessionSession session, int attempt) {
+        if (attempt + 1 >= cameraMountRetries) {
+            handleMountedCameraFailure(session, "The controller and vessel could not be joined on a safe entity region.");
+            return;
+        }
+        Mob vessel = session.vessel();
+        ScheduledTask retry = vessel.getScheduler().runDelayed(plugin, task -> tryMountController(session, attempt + 1), null, 1L);
+        if (retry == null && session.isActive()) {
+            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+        }
+    }
+
+    private void handleMountedCameraFailure(PossessionSession session, String reason) {
+        if (!session.isActive()) {
+            return;
+        }
+        if (cameraFallbackToSpectatorTarget) {
+            notifyPlayer(session.player(), "[Incarnate] Free-look camera fallback: " + reason);
+            attachSpectatorTargetCamera(session, true);
+        } else {
+            notifyPlayer(session.player(), "[Incarnate] Could not attach the free-look camera safely.");
+            requestRelease(session, ReleaseReason.INTERNAL_ERROR);
+        }
+    }
+
+    private void attachSpectatorTargetCamera(PossessionSession session, boolean fallback) {
+        Player player = session.player();
+        Mob vessel = session.vessel();
+        ScheduledTask cameraTask = player.getScheduler().run(plugin, task -> {
+            if (!session.isActive() || !player.isOnline()) {
+                return;
+            }
+            session.cameraTransport(CameraTransport.SPECTATOR_TARGET);
+            try {
                 player.setSpectatorTarget(vessel);
             } catch (IllegalStateException ex) {
                 requestRelease(session, ReleaseReason.VESSEL_REMOVED);
                 return;
             }
-
-            player.sendMessage(Component.text("[Incarnate] Vessel acquired. Left-click: " + abilities.primaryLabel(vessel) + ", F: " + abilities.secondaryLabel(vessel) + ", Shift+F: release."));
+            sendAcquiredMessage(session, fallback ? "legacy spectator fallback" : "spectator target");
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
-        if (attachTask == null) {
-            requestRelease(session, ReleaseReason.QUIT);
+        if (cameraTask == null && session.isActive()) {
+            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
         }
+    }
+
+    private void sendAcquiredMessage(PossessionSession session, String cameraLabel) {
+        Mob vessel = session.vessel();
+        notifyPlayer(session.player(), "[Incarnate] Vessel acquired. Camera: " + cameraLabel + ". Left-click: "
+            + abilities.primaryLabel(vessel) + ", F: " + abilities.secondaryLabel(vessel) + ", Shift+F: release.");
     }
 
     private void startInputSampler(PossessionSession session) {
@@ -313,6 +444,7 @@ public final class PossessionManager {
             session.advanceControlTick();
             try {
                 controller.tick(session, vessel);
+                session.lastKnownVesselLocation(vessel.getLocation());
             } catch (Throwable ex) {
                 task.cancel();
                 plugin.getLogger().log(Level.SEVERE, "Movement controller failed for " + vessel.getType() + " " + session.vesselId(), ex);
@@ -416,6 +548,7 @@ public final class PossessionManager {
 
         Mob vessel = session.vessel();
         ScheduledTask releaseTask = vessel.getScheduler().run(plugin, ignored -> {
+            detachMountedCameraOnVesselThread(session, vessel);
             Location exit = vessel.isValid() ? findExitLocation(vessel) : session.lastKnownVesselLocation();
 
             if (session.origin() == PossessionOrigin.CREATED && removeCreatedOnRelease && vessel.isValid()) {
@@ -432,6 +565,19 @@ public final class PossessionManager {
         }, () -> deferFromRetired(() -> restorePlayer(session, reason, session.lastKnownVesselLocation())));
         if (releaseTask == null) {
             restorePlayer(session, reason, session.lastKnownVesselLocation());
+        }
+    }
+
+    private void detachMountedCameraOnVesselThread(PossessionSession session, Mob vessel) {
+        if (!session.usesMountedCamera()) {
+            return;
+        }
+        Player player = session.player();
+        if (!Bukkit.isOwnedByCurrentRegion(player)) {
+            return;
+        }
+        if (player.getVehicle() == vessel) {
+            vessel.removePassenger(player);
         }
     }
 
@@ -453,12 +599,17 @@ public final class PossessionManager {
                 return;
             }
 
+            if (player.isInsideVehicle()) {
+                player.leaveVehicle();
+            }
             if (player.getGameMode() == GameMode.SPECTATOR) {
                 try {
                     player.setSpectatorTarget(null);
                 } catch (IllegalStateException ignored) {
                 }
             }
+            session.cameraTeleportInProgress(false);
+            session.cameraTransport(CameraTransport.NONE);
 
             restorePlayerState(player, session.playerState());
 
@@ -509,6 +660,11 @@ public final class PossessionManager {
         visibility.forget(session.playerId());
         cancelTasks(session);
 
+        if (player.isInsideVehicle()) {
+            player.leaveVehicle();
+        }
+        session.cameraTeleportInProgress(false);
+        session.cameraTransport(CameraTransport.NONE);
         if (player.getGameMode() == GameMode.SPECTATOR) {
             try {
                 player.setSpectatorTarget(null);
@@ -541,6 +697,12 @@ public final class PossessionManager {
         byPlayer.remove(session.playerId(), session);
         byVessel.remove(session.vesselId(), session);
         cancelTasks(session);
+
+        if (player.isInsideVehicle()) {
+            player.leaveVehicle();
+        }
+        session.cameraTeleportInProgress(false);
+        session.cameraTransport(CameraTransport.NONE);
 
         Mob vessel = session.vessel();
         vessel.getScheduler().run(plugin, ignored -> {
@@ -648,6 +810,11 @@ public final class PossessionManager {
 
             Player player = session.player();
             if (Bukkit.isOwnedByCurrentRegion(player) && player.isOnline()) {
+                if (player.isInsideVehicle()) {
+                    player.leaveVehicle();
+                }
+                session.cameraTeleportInProgress(false);
+                session.cameraTransport(CameraTransport.NONE);
                 if (player.getGameMode() == GameMode.SPECTATOR) {
                     try {
                         player.setSpectatorTarget(null);
