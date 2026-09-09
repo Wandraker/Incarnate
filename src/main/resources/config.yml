@@ -1,3 +1,5 @@
+config-version: 1
+
 control:
   max-possession-distance: 8.0
   release-at-vessel: true
