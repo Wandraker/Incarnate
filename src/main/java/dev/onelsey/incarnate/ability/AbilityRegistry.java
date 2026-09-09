@@ -18,6 +18,7 @@ import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Drowned;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Ghast;
+import org.bukkit.entity.Guardian;
 import org.bukkit.entity.Illusioner;
 import org.bukkit.entity.LargeFireball;
 import org.bukkit.entity.Llama;
@@ -27,12 +28,14 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.Piglin;
 import org.bukkit.entity.Pillager;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.SmallFireball;
 import org.bukkit.entity.Snowball;
 import org.bukkit.entity.Snowman;
 import org.bukkit.entity.Spider;
 import org.bukkit.entity.TraderLlama;
+import org.bukkit.entity.Vex;
 import org.bukkit.entity.Witch;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.WitherSkull;
@@ -73,6 +76,17 @@ public final class AbilityRegistry {
     private final double camelDashVerticalVelocity;
     private final int camelDashCooldownTicks;
     private final int camelDashLockTicks;
+    private final boolean guardianLaserEnabled;
+    private final double guardianLaserRange;
+    private final double guardianLaserRaySize;
+    private final int guardianLaserCooldownTicks;
+    private final boolean pufferFishPuffEnabled;
+    private final int pufferFishPuffCooldownTicks;
+    private final boolean vexChargeEnabled;
+    private final double vexChargeSpeed;
+    private final int vexChargeDurationTicks;
+    private final int vexChargeCooldownTicks;
+    private final int vexChargeLockTicks;
 
     public AbilityRegistry(FileConfiguration config) {
         this.skeletonEnabled = config.getBoolean("abilities.skeleton.enabled", true);
@@ -106,6 +120,17 @@ public final class AbilityRegistry {
         this.camelDashVerticalVelocity = Math.max(0.0, config.getDouble("abilities.camel-dash.vertical-velocity", 0.12));
         this.camelDashCooldownTicks = Math.max(1, config.getInt("abilities.camel-dash.cooldown-ticks", 30));
         this.camelDashLockTicks = Math.max(1, config.getInt("abilities.camel-dash.movement-lock-ticks", 8));
+        this.guardianLaserEnabled = config.getBoolean("abilities.guardian-laser.enabled", true);
+        this.guardianLaserRange = Math.max(2.0, config.getDouble("abilities.guardian-laser.range", 20.0));
+        this.guardianLaserRaySize = Math.max(0.0, config.getDouble("abilities.guardian-laser.ray-size", 0.35));
+        this.guardianLaserCooldownTicks = Math.max(1, config.getInt("abilities.guardian-laser.cooldown-ticks", 100));
+        this.pufferFishPuffEnabled = config.getBoolean("abilities.pufferfish-puff.enabled", true);
+        this.pufferFishPuffCooldownTicks = Math.max(1, config.getInt("abilities.pufferfish-puff.cooldown-ticks", 8));
+        this.vexChargeEnabled = config.getBoolean("abilities.vex-charge.enabled", true);
+        this.vexChargeSpeed = Math.max(0.05, config.getDouble("abilities.vex-charge.speed", 1.25));
+        this.vexChargeDurationTicks = Math.max(1, config.getInt("abilities.vex-charge.duration-ticks", 8));
+        this.vexChargeCooldownTicks = Math.max(1, config.getInt("abilities.vex-charge.cooldown-ticks", 24));
+        this.vexChargeLockTicks = Math.max(1, config.getInt("abilities.vex-charge.movement-lock-ticks", 8));
     }
 
     public boolean triggerPrimary(PossessionSession session) {
@@ -114,6 +139,9 @@ public final class AbilityRegistry {
             return false;
         }
 
+        if (vessel instanceof Guardian guardian && guardianLaserEnabled) {
+            return startGuardianLaser(session, guardian);
+        }
         if (vessel instanceof Creeper creeper && creeperEnabled) {
             return toggleCreeper(session, creeper);
         }
@@ -140,6 +168,12 @@ public final class AbilityRegistry {
             return false;
         }
 
+        if (vessel instanceof PufferFish pufferFish && pufferFishPuffEnabled) {
+            return togglePufferFish(session, pufferFish);
+        }
+        if (vessel instanceof Vex vex && vexChargeEnabled) {
+            return chargeVex(session, vex);
+        }
         if (vessel instanceof Enderman enderman && endermanTeleportEnabled) {
             return teleportEnderman(session, enderman);
         }
@@ -150,6 +184,134 @@ public final class AbilityRegistry {
             return dashCamel(session, camel);
         }
         return false;
+    }
+
+    public void tick(PossessionSession session) {
+        Mob vessel = session.vessel();
+        if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
+            return;
+        }
+        if (vessel instanceof Guardian guardian) {
+            tickGuardianLaser(session, guardian);
+        }
+        if (vessel instanceof Vex vex) {
+            tickVexCharge(session, vex);
+        }
+    }
+
+    public void abortActive(PossessionSession session) {
+        Mob vessel = session.vessel();
+        if (vessel instanceof Guardian guardian && session.guardianLaserActive()) {
+            guardian.setLaser(false);
+            guardian.setTarget(null);
+            session.guardianLaserActive(false);
+        }
+        if (vessel instanceof Vex vex && session.vexChargeActive()) {
+            vex.setCharging(false);
+            session.clearVexCharge();
+        }
+    }
+
+    public String primaryLabel(Mob vessel) {
+        if (vessel instanceof Guardian && guardianLaserEnabled) return "guardian laser";
+        if (vessel instanceof Creeper && creeperEnabled) return "fuse";
+        if (vessel instanceof AbstractSkeleton && skeletonEnabled) return "arrow / melee";
+        if (nativeProjectilesEnabled && projectileFor(vessel) != null) return "projectile";
+        if (nativeRangedEnabled && vessel instanceof RangedEntity && supportsNativeRanged(vessel)) return "ranged attack / melee";
+        return meleeEnabled ? "melee" : "none";
+    }
+
+    public String secondaryLabel(Mob vessel) {
+        if (vessel instanceof PufferFish && pufferFishPuffEnabled) return "puff";
+        if (vessel instanceof Vex && vexChargeEnabled) return "charge";
+        if (vessel instanceof Enderman && endermanTeleportEnabled) return "teleport";
+        if (vessel instanceof Spider && spiderPounceEnabled) return "pounce";
+        if (vessel instanceof Camel && camelDashEnabled) return "dash";
+        return "none";
+    }
+
+    private boolean startGuardianLaser(PossessionSession session, Guardian guardian) {
+        if (session.guardianLaserActive()) {
+            return false;
+        }
+        LivingEntity target = findLivingTarget(session, guardian, guardianLaserRange, guardianLaserRaySize);
+        if (target == null || !guardian.hasLineOfSight(target)) {
+            return false;
+        }
+        int cooldown = Math.max(guardianLaserCooldownTicks, guardian.getLaserDuration() + 10);
+        if (!session.acquirePrimaryCooldown(cooldown)) {
+            return false;
+        }
+
+        guardian.setTarget(target);
+        if (!guardian.setLaser(true)) {
+            guardian.setTarget(null);
+            return false;
+        }
+        guardian.setLaserTicks(-10);
+        guardian.setVelocity(new Vector());
+        session.guardianLaserActive(true);
+        session.lockMovementControl(guardian.getLaserDuration() + 12);
+        return true;
+    }
+
+    private void tickGuardianLaser(PossessionSession session, Guardian guardian) {
+        if (!session.guardianLaserActive()) {
+            return;
+        }
+        LivingEntity target = guardian.getTarget();
+        if (!guardian.hasLaser()
+            || target == null
+            || !Bukkit.isOwnedByCurrentRegion(target)
+            || !target.isValid()
+            || target.isDead()
+            || !guardian.hasLineOfSight(target)) {
+            guardian.setLaser(false);
+            guardian.setTarget(null);
+            session.guardianLaserActive(false);
+            return;
+        }
+
+        int duration = Math.max(1, guardian.getLaserDuration());
+        int nextTicks = Math.max(-10, guardian.getLaserTicks()) + 1;
+        if (nextTicks >= duration) {
+            guardian.setLaserTicks(duration);
+            guardian.setLaser(false);
+            guardian.setTarget(null);
+            session.guardianLaserActive(false);
+            return;
+        }
+        guardian.setLaserTicks(nextTicks);
+    }
+
+    private boolean togglePufferFish(PossessionSession session, PufferFish pufferFish) {
+        if (!session.acquireSecondaryCooldown(pufferFishPuffCooldownTicks)) {
+            return false;
+        }
+        pufferFish.setPuffState(pufferFish.getPuffState() >= 2 ? 0 : 2);
+        return true;
+    }
+
+    private boolean chargeVex(PossessionSession session, Vex vex) {
+        Vector charge = direction(session.view());
+        if (charge.lengthSquared() < 1.0E-6 || !session.acquireSecondaryCooldown(vexChargeCooldownTicks)) {
+            return false;
+        }
+        vex.setCharging(true);
+        session.startVexCharge(vexChargeDurationTicks);
+        session.lockMovementControl(vexChargeLockTicks);
+        vex.setVelocity(charge.normalize().multiply(vexChargeSpeed));
+        return true;
+    }
+
+    private void tickVexCharge(PossessionSession session, Vex vex) {
+        if (session.vexChargeActive()) {
+            return;
+        }
+        if (vex.isCharging()) {
+            vex.setCharging(false);
+        }
+        session.clearVexCharge();
     }
 
     private boolean toggleCreeper(PossessionSession session, Creeper creeper) {

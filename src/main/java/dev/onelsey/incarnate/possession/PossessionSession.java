@@ -30,6 +30,8 @@ public final class PossessionSession {
     private volatile long lastPrimaryAbilityTick = Long.MIN_VALUE;
     private volatile long lastSecondaryAbilityTick = Long.MIN_VALUE;
     private volatile long movementControlLockedUntilTick = Long.MIN_VALUE;
+    private volatile boolean guardianLaserActive;
+    private volatile long vexChargeUntilTick = Long.MIN_VALUE;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
 
     public PossessionSession(
@@ -118,6 +120,21 @@ public final class PossessionSession {
 
     public boolean isMovementControlLocked() {
         return movementControlLockedUntilTick != Long.MIN_VALUE && controlTick <= movementControlLockedUntilTick;
+    }
+
+    public boolean guardianLaserActive() { return guardianLaserActive; }
+    public void guardianLaserActive(boolean active) { this.guardianLaserActive = active; }
+
+    public void startVexCharge(int ticks) {
+        vexChargeUntilTick = controlTick + Math.max(1, ticks);
+    }
+
+    public boolean vexChargeActive() {
+        return vexChargeUntilTick != Long.MIN_VALUE && controlTick <= vexChargeUntilTick;
+    }
+
+    public void clearVexCharge() {
+        vexChargeUntilTick = Long.MIN_VALUE;
     }
 
     public void markSpectatorShiftAttempt() {

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0
+
+Native Abilities Update.
+
+- Added real Guardian / Elder Guardian laser attacks using the Paper Guardian API. The laser charges over native laser ticks and lets the Guardian API apply the actual hit rather than calling manual damage.
+- Guardian laser targets are validated on the vessel-owned Folia region and the attack cancels safely if the target dies, crosses regions, or leaves line of sight.
+- Added PufferFish secondary puff toggle using the real puff state, with normal and crash recovery of the original puff state.
+- Added Vex secondary charge using the real charging state plus a 3D physical impulse and movement-control lock; original charging state is recovered.
+- Added active-ability ticking on the vessel EntityScheduler, separate from movement-controller failure handling.
+- Possession acquisition now tells the controller the actual primary and secondary actions available for that body.
+- Guardian pre-possession laser state is restored on normal release when its original target is still safely restorable; interrupted recovery cancels orphaned laser state rather than guessing a target.
+- CI smoke tests now derive the plugin version from plugin.yml/JAR metadata instead of hardcoding the previous release number.
+- Retains default-deny create/possess/per-mob permissions and unrestricted emergency `/release`.
+
 ## 0.1.0
 
 First source release of Incarnate.

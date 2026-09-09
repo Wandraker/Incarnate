@@ -61,13 +61,13 @@ The per-mob check is enforced in the possession core as well as the commands, so
 
 `incarnate.admin.inspect` is separate and remains `default: op`.
 
-## What 0.1.0 implements
+## What 0.2.0 implements
 
 ### Real bodies
 
 Existing possession preserves the same Mob UUID and its equipment/state. Created incarnation spawns a real Mob and removes it on release by default.
 
-Ender Dragon and Shulker are deliberately excluded in 0.1.0.
+Ender Dragon and Shulker are deliberately excluded in 0.2.0.
 
 ### Controller privacy
 
@@ -85,7 +85,7 @@ Entity ray-trace consumers fail closed on Folia ownership before reading or acti
 
 ### Movement families
 
-0.1.0 has dedicated controllers for:
+0.2.0 has dedicated controllers for:
 
 - ground mobs;
 - flying mobs;
@@ -105,7 +105,7 @@ Unknown/future Mob types fall back to ground movement rather than packet disguis
 
 The body is the projectile source.
 
-Implemented in 0.1.0:
+Implemented in 0.2.0:
 
 - Skeleton / Stray / Bogged / Parched: Arrow when a bow is held;
 - Blaze: Small Fireball;
@@ -114,6 +114,7 @@ Implemented in 0.1.0:
 - Snow Golem: Snowball;
 - Llama / Trader Llama: Llama Spit;
 - Breeze: Breeze Wind Charge;
+- Guardian / Elder Guardian: a real charging Guardian laser, advanced tick-by-tick through the Guardian API until native damage is applied;
 - Creeper: primary toggles the real creeper fuse;
 - Pillager / Piglin: native Paper ranged attack when holding a crossbow;
 - Drowned: native ranged attack when holding a trident;
@@ -126,11 +127,13 @@ Other mobs fall back to a real melee attack when a living target is under the ve
 
 Secondary abilities use a separate cooldown channel from primary attacks.
 
-Implemented in 0.1.0:
+Implemented in 0.2.0:
 
 - Enderman: directional teleport with collision ray tracing and a safe landing search;
 - Spider / Cave Spider: forward pounce from the real body while grounded;
-- Camel: real dashing state plus a physical forward dash impulse.
+- Camel: real dashing state plus a physical forward dash impulse;
+- PufferFish: toggles the real puff state;
+- Vex: native charging state plus a 3D physical charge impulse.
 
 More secondary abilities can be added per Mob without changing the possession core.
 
@@ -138,7 +141,7 @@ More secondary abilities can be added per Mob without changing the possession co
 
 Before taking over an existing Mob, Incarnate stores its original AI/awareness/persistence/despawn/aggressive/gravity and special-state data in PDC. Interrupted sessions can restore marked vessels when they load again. Created orphan vessels are removed by default.
 
-Special-state restoration currently includes sitting state, Bat awake/hanging state, Camel dashing state and Creeper ignition/fuse progress.
+Special-state restoration currently includes sitting state, Bat awake/hanging state, Camel dashing state, Creeper ignition/fuse progress, PufferFish puff state and Vex charging state. Normal release also restores a Guardian's pre-possession laser state when its original target is still safely restorable; crash recovery safely cancels an orphaned laser because its old target cannot be persisted Folia-safely.
 
 On a normal release, Incarnate also restores the Mob's pre-possession combat target when that target is still alive and safely owned by the same Folia region. It deliberately does not perform a cross-region target restore.
 

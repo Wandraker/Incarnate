@@ -5,8 +5,11 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
+import org.bukkit.entity.Guardian;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Sittable;
+import org.bukkit.entity.Vex;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -28,6 +31,8 @@ public final class VesselRecoveryStore {
     private final NamespacedKey batAwakeKey;
     private final NamespacedKey creeperIgnitedKey;
     private final NamespacedKey creeperFuseTicksKey;
+    private final NamespacedKey pufferFishPuffStateKey;
+    private final NamespacedKey vexChargingKey;
 
     public VesselRecoveryStore(IncarnatePlugin plugin) {
         this.index = new VesselRecoveryIndex(plugin);
@@ -44,6 +49,8 @@ public final class VesselRecoveryStore {
         this.batAwakeKey = new NamespacedKey(plugin, "vessel_recovery_bat_awake");
         this.creeperIgnitedKey = new NamespacedKey(plugin, "vessel_recovery_creeper_ignited");
         this.creeperFuseTicksKey = new NamespacedKey(plugin, "vessel_recovery_creeper_fuse_ticks");
+        this.pufferFishPuffStateKey = new NamespacedKey(plugin, "vessel_recovery_pufferfish_puff_state");
+        this.vexChargingKey = new NamespacedKey(plugin, "vessel_recovery_vex_charging");
     }
 
     public void save(Mob mob, PossessionOrigin origin, VesselState state) {
@@ -71,6 +78,12 @@ public final class VesselRecoveryStore {
             } else {
                 data.remove(creeperFuseTicksKey);
             }
+            if (state.pufferFishPuffState() != null) {
+                data.set(pufferFishPuffStateKey, PersistentDataType.INTEGER, state.pufferFishPuffState());
+            } else {
+                data.remove(pufferFishPuffStateKey);
+            }
+            setNullableBool(data, vexChargingKey, state.vexCharging());
             data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
         } catch (RuntimeException ex) {
             index.forget(vesselId);
@@ -138,6 +151,21 @@ public final class VesselRecoveryStore {
                 VesselState.restoreCreeper(creeper, ignited, fuseTicks);
             }
         }
+        if (mob instanceof PufferFish pufferFish) {
+            Integer puffState = data.get(pufferFishPuffStateKey, PersistentDataType.INTEGER);
+            if (puffState != null) {
+                pufferFish.setPuffState(Math.max(0, Math.min(2, puffState)));
+            }
+        }
+        if (mob instanceof Vex vex) {
+            Boolean charging = readNullableBool(data, vexChargingKey);
+            if (charging != null) {
+                vex.setCharging(charging);
+            }
+        }
+        if (mob instanceof Guardian guardian) {
+            guardian.setLaser(false);
+        }
 
         clear(mob);
         return true;
@@ -159,6 +187,8 @@ public final class VesselRecoveryStore {
         data.remove(batAwakeKey);
         data.remove(creeperIgnitedKey);
         data.remove(creeperFuseTicksKey);
+        data.remove(pufferFishPuffStateKey);
+        data.remove(vexChargingKey);
         index.forget(vesselId);
     }
 

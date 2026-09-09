@@ -272,7 +272,7 @@ public final class PossessionManager {
                 return;
             }
 
-            player.sendMessage(Component.text("[Incarnate] Vessel acquired. Left-click: primary, F: secondary, Shift+F: release."));
+            player.sendMessage(Component.text("[Incarnate] Vessel acquired. Left-click: " + abilities.primaryLabel(vessel) + ", F: " + abilities.secondaryLabel(vessel) + ", Shift+F: release."));
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
         if (attachTask == null) {
             requestRelease(session, ReleaseReason.QUIT);
@@ -317,6 +317,17 @@ public final class PossessionManager {
                 task.cancel();
                 plugin.getLogger().log(Level.SEVERE, "Movement controller failed for " + vessel.getType() + " " + session.vesselId(), ex);
                 requestRelease(session, ReleaseReason.INTERNAL_ERROR);
+                return;
+            }
+            try {
+                abilities.tick(session);
+            } catch (Throwable ex) {
+                plugin.getLogger().log(Level.SEVERE, "Active ability tick failed for " + vessel.getType() + " " + session.vesselId(), ex);
+                try {
+                    abilities.abortActive(session);
+                } catch (Throwable cleanupEx) {
+                    plugin.getLogger().log(Level.WARNING, "Failed to abort active ability state for " + session.vesselId(), cleanupEx);
+                }
             }
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)), 1L, 1L);
 

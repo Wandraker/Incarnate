@@ -106,6 +106,20 @@ abilities:
     vertical-velocity: 0.12
     cooldown-ticks: 30
     movement-lock-ticks: 8
+  guardian-laser:
+    enabled: true
+    range: 20.0
+    ray-size: 0.35
+    cooldown-ticks: 100
+  pufferfish-puff:
+    enabled: true
+    cooldown-ticks: 8
+  vex-charge:
+    enabled: true
+    speed: 1.25
+    duration-ticks: 8
+    cooldown-ticks: 24
+    movement-lock-ticks: 8
 
 excluded-types:
   - ENDER_DRAGON

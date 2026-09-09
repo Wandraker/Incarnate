@@ -4,9 +4,12 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
+import org.bukkit.entity.Guardian;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Sittable;
+import org.bukkit.entity.Vex;
 
 public record VesselState(
     boolean aware,
@@ -20,7 +23,11 @@ public record VesselState(
     Boolean camelDashing,
     Boolean batAwake,
     Boolean creeperIgnited,
-    Integer creeperFuseTicks
+    Integer creeperFuseTicks,
+    Boolean guardianLaserActive,
+    Integer guardianLaserTicks,
+    Integer pufferFishPuffState,
+    Boolean vexCharging
 ) {
     public static VesselState capture(Mob mob) {
         Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
@@ -28,6 +35,10 @@ public record VesselState(
         Boolean batAwake = mob instanceof Bat bat ? bat.isAwake() : null;
         Boolean creeperIgnited = mob instanceof Creeper creeper ? creeper.isIgnited() : null;
         Integer creeperFuseTicks = mob instanceof Creeper creeper ? creeper.getFuseTicks() : null;
+        Boolean guardianLaserActive = mob instanceof Guardian guardian ? guardian.hasLaser() : null;
+        Integer guardianLaserTicks = mob instanceof Guardian guardian ? guardian.getLaserTicks() : null;
+        Integer pufferFishPuffState = mob instanceof PufferFish pufferFish ? pufferFish.getPuffState() : null;
+        Boolean vexCharging = mob instanceof Vex vex ? vex.isCharging() : null;
 
         return new VesselState(
             mob.isAware(),
@@ -41,7 +52,11 @@ public record VesselState(
             camelDashing,
             batAwake,
             creeperIgnited,
-            creeperFuseTicks
+            creeperFuseTicks,
+            guardianLaserActive,
+            guardianLaserTicks,
+            pufferFishPuffState,
+            vexCharging
         );
     }
 
@@ -65,6 +80,12 @@ public record VesselState(
             bat.setAwake(true);
             bat.setTargetLocation(null);
         }
+        if (mob instanceof Guardian guardian) {
+            guardian.setLaser(false);
+        }
+        if (mob instanceof Vex vex) {
+            vex.setCharging(false);
+        }
     }
 
     public void restore(Mob mob) {
@@ -78,8 +99,10 @@ public record VesselState(
         mob.setAggressive(aggressive);
         mob.setGravity(gravity);
 
+        boolean targetRestored = false;
         if (target != null && Bukkit.isOwnedByCurrentRegion(target) && target.isValid() && !target.isDead()) {
             mob.setTarget(target);
+            targetRestored = true;
         }
         if (mob instanceof Sittable sittable && sitting != null) {
             sittable.setSitting(sitting);
@@ -93,6 +116,19 @@ public record VesselState(
         }
         if (mob instanceof Creeper creeper && creeperIgnited != null && creeperFuseTicks != null) {
             restoreCreeper(creeper, creeperIgnited, creeperFuseTicks);
+        }
+        if (mob instanceof PufferFish pufferFish && pufferFishPuffState != null) {
+            pufferFish.setPuffState(Math.max(0, Math.min(2, pufferFishPuffState)));
+        }
+        if (mob instanceof Vex vex && vexCharging != null) {
+            vex.setCharging(vexCharging);
+        }
+        if (mob instanceof Guardian guardian) {
+            guardian.setLaser(false);
+            if (Boolean.TRUE.equals(guardianLaserActive) && guardianLaserTicks != null && targetRestored && guardian.setLaser(true)) {
+                int safeTicks = Math.max(-10, Math.min(Math.max(-10, guardian.getLaserDuration() - 1), guardianLaserTicks));
+                guardian.setLaserTicks(safeTicks);
+            }
         }
     }
 
