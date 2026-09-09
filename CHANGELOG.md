@@ -12,6 +12,12 @@ Free-Look Camera & Mob Polish Update.
 - The control loop now centrally refreshes the last known vessel location every successful tick, improving emergency/recovery exit positioning even for controller families that do not update it themselves.
 - Added a native Ravager secondary roar using the real Paper/vanilla roar state (`setRoarTicks(11)`) rather than synthetic damage/effects.
 - Ravager attack, stun and roar tick state is preserved across normal release and persisted for interrupted-session recovery.
+- Added a centralized Adventure MiniMessage presentation layer with an Incarnate-specific clay/moss/amber theme instead of hardcoded `[Incarnate]` chat strings.
+- Added bundled `en_US` and `ru_RU` localizations. `messages.yml` can use a fixed locale or `auto`, which follows the Player client locale when a bundled translation exists and otherwise uses the configured fallback locale.
+- Added customizable named theme tokens (`primary`, `secondary`, `accent`, `text`, `muted`, `success`, `warning`, `error`) and a customizable MiniMessage prefix. User overrides in `messages.yml` are layered over bundled locale defaults so future message keys do not require replacing an existing customized file.
+- Ability and camera labels are localized as stable message keys instead of being embedded English text.
+- Added `config-version: 1` and non-destructive gameplay config migration. Existing `config.yml` values are never replaced by new defaults; only missing keys are added, a pre-migration backup is written under `plugins/Incarnate/backups/`, and the update is saved through a temporary file/atomic move when supported.
+- Added locale/theme regression tests that require English and Russian bundles to expose the same message keys and validate bundled MiniMessage templates.
 - Existing 0.2.0 native abilities, default-deny permissions, per-mob permissions, concealment and crash recovery remain intact.
 - The mounted free-look transport still requires live client validation across representative mobs and server implementations before it is treated as gameplay-final.
 
