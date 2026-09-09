@@ -1,0 +1,42 @@
+name: Remove Private Tag integration
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  revert:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Restore clean pre-integration files
+        shell: bash
+        run: |
+          git checkout 186ed9e8ee142d9e8df154aa6de3d18dfff9d1e8 -- \
+            src/main/java/dev/onelsey/incarnate/IncarnatePlugin.java \
+            src/main/java/dev/onelsey/incarnate/possession/PossessionManager.java \
+            src/main/resources/plugin.yml \
+            src/main/resources/config.yml \
+            README.md \
+            CHANGELOG.md
+          git rm -f src/main/java/dev/onelsey/incarnate/integration/ElysiumPrivateTagIntegration.java || true
+          git rm -f src/test/java/dev/onelsey/incarnate/integration/IntegrationDescriptorTest.java || true
+      - name: Commit clean Incarnate
+        shell: bash
+        run: |
+          if git diff --cached --quiet && git diff --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'Onelsey'
+          git config user.email '103017546+Wandraker@users.noreply.github.com'
+          git add -A
+          git commit -m 'Remove private tag integration [skip ci]'
+          git push
