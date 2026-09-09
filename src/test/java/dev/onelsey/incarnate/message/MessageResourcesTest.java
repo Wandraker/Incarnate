@@ -25,7 +25,8 @@ class MessageResourcesTest {
     );
     private static final Set<String> PLACEHOLDERS = Set.of(
         "entity", "distance", "mob", "vessel", "controller", "controller_uuid", "origin",
-        "reason", "camera", "primary_action", "secondary_action"
+        "reason", "camera", "primary_action", "secondary_action",
+        "sense_kind", "sense_direction", "sense_distance"
     );
 
     @Test
@@ -44,7 +45,7 @@ class MessageResourcesTest {
         assertEquals(1, messages.getInt("config-version"));
 
         YamlConfiguration config = load("src/main/resources/config.yml");
-        assertEquals(3, config.getInt("config-version"));
+        assertEquals(4, config.getInt("config-version"));
     }
 
     @Test

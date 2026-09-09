@@ -9,6 +9,9 @@ import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
 import dev.onelsey.incarnate.movement.VesselController;
 import dev.onelsey.incarnate.permission.IncarnatePermissions;
+import dev.onelsey.incarnate.sense.VesselPositionSnapshot;
+import dev.onelsey.incarnate.sense.WardenSenseMath;
+import dev.onelsey.incarnate.sense.WardenSenseSnapshot;
 import dev.onelsey.incarnate.visibility.PossessionVisibilityManager;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
@@ -53,6 +56,12 @@ public final class PossessionManager {
     private final int hudIntervalTicks;
     private final boolean hudShowHealth;
     private final boolean hudShowAbilities;
+    private final boolean hudShowSenses;
+    private final boolean wardenSensesEnabled;
+    private final double wardenSenseMaxRange;
+    private final int wardenSenseMemoryTicks;
+    private final boolean wardenSenseIgnoreSelf;
+    private final boolean wardenSenseShowEventKind;
     private final PlayerRecoveryStore playerRecovery;
     private final VesselRecoveryStore vesselRecovery;
 
@@ -87,6 +96,12 @@ public final class PossessionManager {
         this.hudIntervalTicks = Math.max(1, plugin.getConfig().getInt("hud.actionbar.interval-ticks", 4));
         this.hudShowHealth = plugin.getConfig().getBoolean("hud.actionbar.show-health", true);
         this.hudShowAbilities = plugin.getConfig().getBoolean("hud.actionbar.show-abilities", true);
+        this.hudShowSenses = plugin.getConfig().getBoolean("hud.actionbar.show-senses", true);
+        this.wardenSensesEnabled = plugin.getConfig().getBoolean("senses.warden.enabled", true);
+        this.wardenSenseMaxRange = Math.max(1.0, plugin.getConfig().getDouble("senses.warden.max-range", 32.0));
+        this.wardenSenseMemoryTicks = Math.max(1, plugin.getConfig().getInt("senses.warden.memory-ticks", 40));
+        this.wardenSenseIgnoreSelf = plugin.getConfig().getBoolean("senses.warden.ignore-self", true);
+        this.wardenSenseShowEventKind = plugin.getConfig().getBoolean("senses.warden.show-event-kind", true);
         this.playerRecovery = new PlayerRecoveryStore(plugin);
         this.vesselRecovery = new VesselRecoveryStore(plugin);
     }
@@ -432,7 +447,9 @@ public final class PossessionManager {
     }
 
     private void startHud(PossessionSession session) {
-        if (!hudEnabled || (!hudShowHealth && !hudShowAbilities)) {
+        boolean baseHud = hudShowHealth || hudShowAbilities;
+        boolean senseHud = hudShowSenses && wardenSensesEnabled && session.vesselType() == EntityType.WARDEN;
+        if (!hudEnabled || (!baseHud && !senseHud)) {
             return;
         }
         Player player = session.player();
@@ -442,24 +459,62 @@ public final class PossessionManager {
                 return;
             }
 
-            VesselTelemetry telemetry = session.telemetry();
-            String messageKey = hudShowHealth && hudShowAbilities
-                ? "hud.line"
-                : hudShowHealth ? "hud.health-only" : "hud.abilities-only";
+            Component line = Component.empty();
+            if (baseHud) {
+                VesselTelemetry telemetry = session.telemetry();
+                String messageKey = hudShowHealth && hudShowAbilities
+                    ? "hud.line"
+                    : hudShowHealth ? "hud.health-only" : "hud.abilities-only";
 
-            player.sendActionBar(messages.render(player, messageKey, Map.of(
-                "health", Component.text(formatHudNumber(telemetry.health())),
-                "max_health", Component.text(formatHudNumber(telemetry.maxHealth())),
-                "primary_action", messages.abilityLabel(player, session.primaryAbilityKey()),
-                "secondary_action", messages.abilityLabel(player, session.secondaryAbilityKey()),
-                "primary_state", cooldownState(player, session.primaryAbilityKey(), session.primaryCooldownRemainingTicks()),
-                "secondary_state", cooldownState(player, session.secondaryAbilityKey(), session.secondaryCooldownRemainingTicks())
-            )));
+                line = messages.render(player, messageKey, Map.of(
+                    "health", Component.text(formatHudNumber(telemetry.health())),
+                    "max_health", Component.text(formatHudNumber(telemetry.maxHealth())),
+                    "primary_action", messages.abilityLabel(player, session.primaryAbilityKey()),
+                    "secondary_action", messages.abilityLabel(player, session.secondaryAbilityKey()),
+                    "primary_state", cooldownState(player, session.primaryAbilityKey(), session.primaryCooldownRemainingTicks()),
+                    "secondary_state", cooldownState(player, session.secondaryAbilityKey(), session.secondaryCooldownRemainingTicks())
+                ));
+            }
+
+            Component sense = wardenSenseHud(player, session);
+            if (sense != null) {
+                if (baseHud) {
+                    line = line.append(messages.render(player, "hud.separator"));
+                }
+                line = line.append(sense);
+            }
+            if (baseHud || sense != null) {
+                player.sendActionBar(line);
+            }
         }, null, 1L, hudIntervalTicks);
         session.hudTask(hudTask);
         if (hudTask == null) {
             requestRelease(session, ReleaseReason.QUIT);
         }
+    }
+
+    private Component wardenSenseHud(Player player, PossessionSession session) {
+        if (!hudShowSenses || !wardenSensesEnabled || session.vesselType() != EntityType.WARDEN) {
+            return null;
+        }
+        WardenSenseSnapshot sense = session.activeWardenSense();
+        VesselPositionSnapshot position = session.vesselPosition();
+        if (sense == null || position == null || !position.worldId().equals(sense.worldId())) {
+            return null;
+        }
+
+        double dx = sense.x() - position.x();
+        double dy = sense.y() - position.y();
+        double dz = sense.z() - position.z();
+        double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        String direction = WardenSenseMath.directionKey(session.view().yaw(), dx, dz);
+        String kind = wardenSenseShowEventKind ? sense.kind() : "vibration";
+
+        return messages.render(player, "hud.sense", Map.of(
+            "sense_kind", messages.render(player, "sense.kind." + kind),
+            "sense_direction", messages.render(player, "sense.direction." + direction),
+            "sense_distance", Component.text(formatHudNumber(distance))
+        ));
     }
 
     private Component cooldownState(Player player, String abilityKey, int remainingTicks) {
@@ -558,6 +613,41 @@ public final class PossessionManager {
         PossessionSession session = session(player);
         if (session != null && session.isActive()) {
             session.view(new ViewSnapshot(yaw, pitch));
+        }
+    }
+
+    public void recordWardenGameEvent(
+        UUID worldId,
+        double x,
+        double y,
+        double z,
+        String eventKey,
+        int eventRadius,
+        UUID sourceId
+    ) {
+        if (!wardenSensesEnabled || eventRadius <= 0) {
+            return;
+        }
+        double range = Math.min(wardenSenseMaxRange, eventRadius);
+        double rangeSquared = range * range;
+        String kind = WardenSenseMath.kindKey(eventKey);
+
+        for (PossessionSession session : byPlayer.values()) {
+            if (!session.isActive() || session.vesselType() != EntityType.WARDEN) {
+                continue;
+            }
+            if (wardenSenseIgnoreSelf && sourceId != null
+                && (sourceId.equals(session.playerId()) || sourceId.equals(session.vesselId()))) {
+                continue;
+            }
+            VesselPositionSnapshot position = session.vesselPosition();
+            if (position == null || !position.worldId().equals(worldId)) {
+                continue;
+            }
+            if (position.distanceSquared(x, y, z) > rangeSquared) {
+                continue;
+            }
+            session.recordWardenSense(worldId, x, y, z, kind, eventKey, wardenSenseMemoryTicks);
         }
     }
 

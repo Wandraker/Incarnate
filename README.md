@@ -94,7 +94,7 @@ When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible 
 
 This means tuned movement speeds, cooldowns, camera choices, release behavior, excluded mobs and other existing settings are not reset merely because a later release adds new options.
 
-## What 0.6.0 implements
+## What 0.7.0 implements
 
 ### Real bodies
 
@@ -255,11 +255,29 @@ Paper provides a Goat ram API, but its implementation writes directly into Goat 
 
 Incarnate therefore does not currently expose Goat ram rather than leaving a possessed existing mob with silently modified brain state after `/release`.
 
-### Warden note
+### Warden senses
 
-Incarnate does not make a possessed Warden player literally blind by default. A future immersive sensory mode can represent vibrations or disturbances through HUD/audio cues without making the body impractical to control.
+Incarnate does not make a possessed Warden player literally blind by default. 0.7.0 adds a passive sensory layer instead: Bukkit/Paper game events that belong to Minecraft's `WARDEN_CAN_LISTEN` tag can be surfaced in the possession HUD when they occur within the event's own broadcast radius and the configured Incarnate maximum range.
 
-The current Paper API exposes Warden anger and disturbance operations, but not a complete enumerable snapshot of every per-entity anger/Brain entry. For that reason 0.6.0 does not force native sonic-boom AI by mutating anger and then pretending the previous state can be restored exactly.
+The HUD reports a broad event kind, direction relative to the controller's current view, and approximate distance. Eligible signals are not limited to players; movement, projectiles, combat, block activity, interactions and other Warden-listenable game events can all produce feedback.
+
+```yaml
+hud:
+  actionbar:
+    show-senses: true
+
+senses:
+  warden:
+    enabled: true
+    max-range: 32.0
+    memory-ticks: 40
+    ignore-self: true
+    show-event-kind: true
+```
+
+This layer is intentionally informational. It does not call `increaseAnger`, `setAnger` or `setDisturbanceLocation`, and it does not modify Warden Brain memories merely to manufacture a sonic-boom ability. The public API does not expose a complete enumerable snapshot of every per-entity anger/Brain entry, so Incarnate keeps that state untouched until a genuinely reversible implementation exists.
+
+The signal is based on emitted game-event metadata and range rather than a full reimplementation of Mojang's internal vibration-path physics. Live testing is therefore still required to tune density and presentation in noisy environments.
 
 ## Recovery
 

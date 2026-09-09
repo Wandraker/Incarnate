@@ -49,6 +49,27 @@ messages:
     ready: '<success>ГОТОВО</success>'
     cooldown: '<warning><seconds>с</warning>'
     unavailable: '<muted>—</muted>'
+    separator: ' <dark_gray>•</dark_gray> '
+    sense: '<secondary>◈</secondary> <accent><sense_kind></accent> <muted><sense_direction></muted> <text><sense_distance>м</text>'
+
+  sense:
+    kind:
+      movement: 'движение'
+      projectile: 'снаряд'
+      combat: 'бой'
+      block: 'блок'
+      action: 'действие'
+      vibration: 'вибрация'
+    direction:
+      near: 'рядом'
+      front: 'впереди'
+      front-right: 'справа-впереди'
+      right: 'справа'
+      back-right: 'справа-сзади'
+      back: 'сзади'
+      back-left: 'слева-сзади'
+      left: 'слева'
+      front-left: 'слева-впереди'
 
   camera:
     mounted-free-look: 'свободная камера'

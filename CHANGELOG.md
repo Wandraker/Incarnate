@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.0
+
+Warden Senses update.
+
+- Added a passive Warden sensory layer driven by real Bukkit/Paper `GenericGameEvent` emissions that are present in Minecraft's `WARDEN_CAN_LISTEN` game-event tag. Incarnate does not poll nearby entities every tick and does not fabricate a player-only radar.
+- Possessed Wardens keep normal player vision by default. The sensory layer augments control instead of forcing blindness or Darkness.
+- Warden sensory HUD reports a localized event category, direction relative to the controller's current view, and distance. It can react to eligible movement, projectiles, combat, block activity, interactions and other Warden-listenable vibrations, not only players.
+- Added configurable Warden sense range, memory duration, self-event suppression and event-kind display. The effective range is clamped by the original game-event broadcast radius.
+- Added immutable vessel-position and Warden-sense snapshots so world-event capture does not need to read the live Warden from the Player HUD thread. Active Warden sessions are identified by a vessel type captured at possession start.
+- Warden sensing is informational only: it does not mutate anger, disturbance location or Brain memories, so an existing Warden's autonomous state is not damaged merely to provide possession feedback.
+- Added pure regression tests for Minecraft-yaw-relative eight-sector direction mapping, event categorization and sense expiry.
+- Bumped gameplay config schema to 4; upgrades remain additive/non-destructive.
+- This is still a live-gameplay candidate: vibration density and HUD readability should be tuned on a real server, especially around farms/redstone-heavy areas and multiple simultaneous event sources.
+
 ## 0.6.0
 
 Native Behavior & State Fidelity update.
