@@ -1,0 +1,27 @@
+name: Incarnate
+version: 0.1.0
+main: dev.onelsey.incarnate.IncarnatePlugin
+api-version: '26.2'
+authors: [Onelsey]
+description: True mob incarnation and possession using real server entities.
+folia-supported: true
+commands:
+  incarnate:
+    description: Create a real mob body and incarnate into it.
+    usage: /incarnate <mob|primary>
+    permission: incarnate.use.incarnate
+  possess:
+    description: Possess the real mob you are looking at.
+    usage: /possess
+    permission: incarnate.use.possess
+  release:
+    description: Leave the current vessel.
+    usage: /release
+    permission: incarnate.use.release
+permissions:
+  incarnate.use.incarnate:
+    default: op
+  incarnate.use.possess:
+    default: op
+  incarnate.use.release:
+    default: op

@@ -1,0 +1,81 @@
+control:
+  max-possession-distance: 8.0
+  release-at-vessel: true
+
+release-key:
+  shift-swap-offhand: true
+  spectator-shift-latch-ms: 650
+
+visibility:
+  hide-controller-from-tab: true
+
+created-vessels:
+  remove-on-release: true
+  remove-orphaned-after-recovery: true
+
+movement:
+  ground:
+    fallback-walk-speed: 0.24
+    attribute-scale: 1.0
+    minimum-walk-speed: 0.06
+    maximum-walk-speed: 0.55
+    sprint-multiplier: 1.30
+    air-control: 0.35
+    fallback-jump-velocity: 0.42
+    preserve-existing-vertical-velocity: true
+    hurt-input-control: 0.25
+    idle-horizontal-damping: 0.65
+  flight:
+    speed: 0.34
+    sprint-multiplier: 1.35
+    acceleration: 0.55
+    idle-damping: 0.72
+    hurt-input-control: 0.30
+  aquatic:
+    speed: 0.27
+    sprint-multiplier: 1.25
+    acceleration: 0.45
+    idle-damping: 0.82
+    beached-hop-velocity: 0.28
+    hurt-input-control: 0.35
+  hopping:
+    hop-interval-ticks: 5
+    jump-multiplier: 1.0
+    sprint-multiplier: 1.20
+    air-control: 0.20
+    idle-horizontal-damping: 0.70
+    hurt-input-control: 0.25
+  climbing:
+    climb-velocity: 0.24
+    wall-probe-distance: 0.45
+  cube:
+    speed: 0.23
+    sprint-multiplier: 1.25
+    base-hop-velocity: 0.42
+    size-hop-bonus: 0.015
+    hop-interval-ticks: 6
+    idle-damping: 0.72
+    hurt-input-control: 0.25
+
+abilities:
+  skeleton:
+    enabled: true
+    require-bow: true
+    arrow-speed: 3.0
+    cooldown-ticks: 12
+  native-projectiles:
+    enabled: true
+    speed: 1.5
+    cooldown-ticks: 14
+  creeper:
+    enabled: true
+    cooldown-ticks: 5
+  melee:
+    enabled: true
+    range: 3.25
+    ray-size: 0.30
+    cooldown-ticks: 10
+
+excluded-types:
+  - ENDER_DRAGON
+  - SHULKER
