@@ -59,6 +59,41 @@ This permission model is suitable for ranks or donor perks. Per-mob checks are e
 
 `incarnate.admin.inspect` remains separate and `default: op`.
 
+## Messages, theme and localization
+
+Incarnate uses Adventure MiniMessage for player-facing output instead of hardcoded legacy color strings.
+
+`plugins/Incarnate/messages.yml` controls the presentation layer without touching gameplay settings. The default Incarnate theme uses clay, moss, amber, warm parchment and terracotta tones and exposes named tags:
+
+- `<primary>`
+- `<secondary>`
+- `<accent>`
+- `<text>`
+- `<muted>`
+- `<success>`
+- `<warning>`
+- `<error>`
+
+The prefix is also a normal MiniMessage value and can be fully replaced by the server owner.
+
+Bundled message locales currently include `en_US` and `ru_RU`. With `locale: auto`, Incarnate follows the player's client locale when a bundled translation exists and otherwise uses `fallback-locale`.
+
+The user `messages.yml` is an override layer rather than a copied full language pack. Bundled locale defaults remain inside the plugin JAR, so new messages introduced by later Incarnate versions become available automatically without replacing existing server theme/prefix/message overrides.
+
+## Safe configuration upgrades
+
+Gameplay configuration is versioned separately with `config-version`.
+
+When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible Incarnate build:
+
+- existing values are kept exactly as the server configured them;
+- only settings missing from the old file are copied from the new bundled defaults;
+- before the first migration write, the original file is backed up under `plugins/Incarnate/backups/`;
+- the migrated file is written through a temporary file and atomic replace when the filesystem supports it;
+- a configuration from a newer unsupported schema is rejected rather than silently downgraded.
+
+This means tuned movement speeds, cooldowns, camera choices, release behavior, excluded mobs and other existing settings are not reset merely because a later release adds new options.
+
 ## What 0.3.0 implements
 
 ### Real bodies
@@ -177,7 +212,9 @@ The original awareness state is restored on release and interrupted-session reco
 
 GitHub Actions runs unit tests and compiles Incarnate with Java 25 against Paper API `26.2.build.121-stable`, then starts a real Paper 26.2 build 121 server and performs a graceful startup/shutdown smoke test.
 
-Validated CI builds also expose the built JAR as a workflow artifact after the Paper smoke test passes.
+The test suite also validates that bundled locales expose the same message keys, bundled MiniMessage templates parse successfully, and config migration adds new defaults without replacing existing tuned values.
+
+Validated CI builds expose the built JAR as a workflow artifact after the Paper smoke test passes.
 
 Live gameplay testing remains the final gate for camera feel, mounted-camera behavior and individual Mob mechanics.
 
