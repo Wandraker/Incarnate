@@ -9,6 +9,13 @@ camera:
   mount-retries: 8
   fallback-to-spectator-target: true
 
+hud:
+  actionbar:
+    enabled: true
+    interval-ticks: 4
+    show-health: true
+    show-abilities: true
+
 release-key:
   shift-swap-offhand: true
   spectator-shift-latch-ms: 650
@@ -131,6 +138,14 @@ abilities:
     enabled: true
     cooldown-ticks: 80
     movement-lock-ticks: 12
+  evoker-fangs:
+    enabled: true
+    count: 8
+    spacing: 1.25
+    cooldown-ticks: 50
+    cast-ticks: 20
+    attack-delay-step: 2
+    ground-search-blocks: 3
 
 excluded-types:
   - ENDER_DRAGON
