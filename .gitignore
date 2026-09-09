@@ -5,10 +5,3 @@ out/
 *.iml
 *.class
 *.jar
-AI_HANDOVER.md
-AI_HANDOVER-*.md
-HANDOVER*.md
-EMERGENCY-HANDOVER*.md
-TESTING-*.md
-RELEASE-NOTES-*.md
-/internal-notes/
