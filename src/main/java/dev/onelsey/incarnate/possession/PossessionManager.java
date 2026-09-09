@@ -515,7 +515,6 @@ public final class PossessionManager {
         restoringPlayers.add(session.playerId());
         byPlayer.remove(session.playerId(), session);
         byVessel.remove(session.vesselId(), session);
-        visibility.forget(session.playerId());
         cancelTasks(session);
 
         Mob vessel = session.vessel();
@@ -552,6 +551,9 @@ public final class PossessionManager {
         if (!playerRecovery.hasRecovery(player)) {
             restoringPlayers.remove(playerId);
             recoveryInFlight.remove(playerId);
+            if (visibility.isConcealed(playerId)) {
+                visibility.reveal(playerId, player);
+            }
             return;
         }
 
@@ -620,7 +622,7 @@ public final class PossessionManager {
             cancelTasks(session);
 
             Player player = session.player();
-            if (player.isOnline() && Bukkit.isOwnedByCurrentRegion(player)) {
+            if (Bukkit.isOwnedByCurrentRegion(player) && player.isOnline()) {
                 if (player.getGameMode() == GameMode.SPECTATOR) {
                     try {
                         player.setSpectatorTarget(null);
@@ -631,7 +633,7 @@ public final class PossessionManager {
             }
 
             Mob vessel = session.vessel();
-            if (vessel.isValid() && Bukkit.isOwnedByCurrentRegion(vessel)) {
+            if (Bukkit.isOwnedByCurrentRegion(vessel) && vessel.isValid()) {
                 if (session.origin() == PossessionOrigin.CREATED && removeCreatedOnRelease) {
                     vesselRecovery.clear(vessel);
                     vessel.remove();
