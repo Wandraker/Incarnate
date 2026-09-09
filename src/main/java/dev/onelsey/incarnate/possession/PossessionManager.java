@@ -647,7 +647,7 @@ public final class PossessionManager {
 
             // JavaPlugin is already disabled before onDisable runs, so scheduling here is illegal on Folia.
             // Recovery PDC remains authoritative for state that the current region does not safely own.
-            visibility.forget(session.playerId());
+            visibility.detachForDisable(session.playerId());
         }
 
         byPlayer.clear();

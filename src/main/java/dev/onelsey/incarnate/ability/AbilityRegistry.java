@@ -3,6 +3,7 @@ package dev.onelsey.incarnate.ability;
 import com.destroystokyo.paper.entity.RangedEntity;
 import dev.onelsey.incarnate.input.ViewSnapshot;
 import dev.onelsey.incarnate.possession.PossessionSession;
+import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -219,7 +220,8 @@ public final class AbilityRegistry {
             FluidCollisionMode.NEVER,
             true,
             raySize,
-            entity -> entity instanceof LivingEntity
+            entity -> Bukkit.isOwnedByCurrentRegion(entity)
+                && entity instanceof LivingEntity
                 && !entity.getUniqueId().equals(vessel.getUniqueId())
                 && (!(entity instanceof Player player) || !player.getUniqueId().equals(session.playerId()))
         );
