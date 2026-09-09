@@ -62,7 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          USER_AGENT='Incarnate-CI/0.1.0 (GitHub Actions)'
+          USER_AGENT='Incarnate-CI (GitHub Actions)'
           BUILDS=$(curl -fsSL -H "User-Agent: ${USER_AGENT}" 'https://fill.papermc.io/v3/projects/paper/versions/26.2/builds')
           PAPER_URL=$(printf '%s' "$BUILDS" | jq -r 'first(.[] | select(.id == 121) | .downloads."server:default".url) // empty')
           test -n "$PAPER_URL"
@@ -72,8 +72,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          PLUGIN_VERSION=$(sed -n 's/^version: //p' src/main/resources/plugin.yml | head -n1 | tr -d "'\"")
+          test -n "$PLUGIN_VERSION"
+          PLUGIN_JAR="build/libs/Incarnate-${PLUGIN_VERSION}.jar"
+          test -f "$PLUGIN_JAR"
+
           mkdir -p ci-server/plugins
-          cp build/libs/Incarnate-0.1.0.jar ci-server/plugins/Incarnate.jar
+          cp "$PLUGIN_JAR" ci-server/plugins/Incarnate.jar
           cp paper.jar ci-server/paper.jar
           printf 'eula=true\n' > ci-server/eula.txt
           mkfifo ci-server/server-input
@@ -99,7 +104,7 @@ jobs:
           READY=0
           for _ in $(seq 1 100); do
             if grep -Eq 'Done \([^)]*\)! For help, type "help"' paper-smoke.log 2>/dev/null \
-              && grep -Fq 'Incarnate 0.1.0 enabled for Minecraft 26.2+' paper-smoke.log 2>/dev/null; then
+              && grep -Fq "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log 2>/dev/null; then
               READY=1
               break
             fi
@@ -139,8 +144,8 @@ jobs:
           trap - EXIT
           cat paper-smoke.log
 
-          grep -F 'Incarnate 0.1.0 enabled for Minecraft 26.2+' paper-smoke.log
-          grep -F 'Disabling Incarnate v0.1.0' paper-smoke.log
+          grep -F "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log
+          grep -F "Disabling Incarnate v${PLUGIN_VERSION}" paper-smoke.log
 
           if grep -E 'Error occurred while enabling Incarnate|Error occurred while disabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate|IllegalPluginAccessException' paper-smoke.log; then
             exit 1
