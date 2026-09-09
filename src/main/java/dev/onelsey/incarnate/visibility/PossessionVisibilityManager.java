@@ -79,6 +79,10 @@ public final class PossessionVisibilityManager {
         forgetTabController(controllerId);
     }
 
+    public void detachForDisable(UUID controllerId) {
+        concealedPlayers.remove(controllerId);
+    }
+
     public void applyToJoiningViewer(Player viewer) {
         viewer.getScheduler().run(plugin, task -> {
             UUID viewerId = viewer.getUniqueId();
