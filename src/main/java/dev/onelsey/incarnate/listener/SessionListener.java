@@ -10,6 +10,9 @@ import dev.onelsey.incarnate.possession.PossessionSession;
 import dev.onelsey.incarnate.possession.ReleaseReason;
 import io.papermc.paper.event.player.PlayerArmSwingEvent;
 import io.papermc.paper.event.player.PlayerTrackEntityEvent;
+import org.bukkit.Bukkit;
+import org.bukkit.Tag;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -28,6 +31,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
+import org.bukkit.event.world.GenericGameEvent;
 import org.bukkit.inventory.EquipmentSlot;
 
 import java.util.concurrent.TimeUnit;
@@ -175,6 +179,33 @@ public final class SessionListener implements Listener {
             return AbilityGesture.SPRINT_PRIMARY;
         }
         return AbilityGesture.PRIMARY;
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onGameEvent(GenericGameEvent event) {
+        if (!Tag.GAME_EVENT_WARDEN_CAN_LISTEN.isTagged(event.getEvent())) {
+            return;
+        }
+
+        Entity source = event.getEntity();
+        java.util.UUID sourceId = null;
+        if (source != null && Bukkit.isOwnedByCurrentRegion(source)) {
+            if (source.isSneaking() && Tag.GAME_EVENT_IGNORE_VIBRATIONS_SNEAKING.isTagged(event.getEvent())) {
+                return;
+            }
+            sourceId = source.getUniqueId();
+        }
+
+        org.bukkit.Location location = event.getLocation();
+        possessions.recordWardenGameEvent(
+            location.getWorld().getUID(),
+            location.getX(),
+            location.getY(),
+            location.getZ(),
+            event.getEvent().getKey().getKey(),
+            event.getRadius(),
+            sourceId
+        );
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)

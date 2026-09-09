@@ -2,10 +2,13 @@ package dev.onelsey.incarnate.possession;
 
 import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.ViewSnapshot;
+import dev.onelsey.incarnate.sense.VesselPositionSnapshot;
+import dev.onelsey.incarnate.sense.WardenSenseSnapshot;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 
@@ -16,6 +19,7 @@ public final class PossessionSession {
     private final UUID playerId;
     private final String playerName;
     private final UUID vesselId;
+    private final EntityType vesselType;
     private final Player player;
     private final Mob vessel;
     private final PossessionOrigin origin;
@@ -28,6 +32,8 @@ public final class PossessionSession {
     private volatile InputSnapshot input;
     private volatile ViewSnapshot view;
     private volatile Location lastKnownVesselLocation;
+    private volatile VesselPositionSnapshot vesselPosition;
+    private volatile WardenSenseSnapshot wardenSense;
     private volatile ScheduledTask controlTask;
     private volatile ScheduledTask inputSamplerTask;
     private volatile ScheduledTask hudTask;
@@ -61,6 +67,7 @@ public final class PossessionSession {
         this.playerId = playerId;
         this.playerName = player.getName();
         this.vesselId = vessel.getUniqueId();
+        this.vesselType = vessel.getType();
         this.player = player;
         this.vessel = vessel;
         this.origin = origin;
@@ -69,12 +76,14 @@ public final class PossessionSession {
         this.input = initialInput;
         this.view = initialView;
         this.lastKnownVesselLocation = vessel.getLocation().clone();
+        this.vesselPosition = VesselPositionSnapshot.from(this.lastKnownVesselLocation);
         this.telemetry = new VesselTelemetry(vessel.getHealth(), maxHealth(vessel));
     }
 
     public UUID playerId() { return playerId; }
     public String playerName() { return playerName; }
     public UUID vesselId() { return vesselId; }
+    public EntityType vesselType() { return vesselType; }
     public Player player() { return player; }
     public Mob vessel() { return vessel; }
     public PossessionOrigin origin() { return origin; }
@@ -95,7 +104,27 @@ public final class PossessionSession {
     public void lastKnownVesselLocation(Location location) {
         if (location != null) {
             this.lastKnownVesselLocation = location.clone();
+            this.vesselPosition = VesselPositionSnapshot.from(location);
         }
+    }
+
+    public VesselPositionSnapshot vesselPosition() { return vesselPosition; }
+
+    public void recordWardenSense(UUID worldId, double x, double y, double z, String kind, String eventKey, int memoryTicks) {
+        long expires = controlTick + Math.max(1, memoryTicks);
+        this.wardenSense = new WardenSenseSnapshot(worldId, x, y, z, kind, eventKey, expires);
+    }
+
+    public WardenSenseSnapshot activeWardenSense() {
+        WardenSenseSnapshot snapshot = wardenSense;
+        if (snapshot == null || !snapshot.isActive(controlTick)) {
+            return null;
+        }
+        return snapshot;
+    }
+
+    public void clearWardenSense() {
+        this.wardenSense = null;
     }
 
     public ScheduledTask controlTask() { return controlTask; }

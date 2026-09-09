@@ -49,6 +49,27 @@ messages:
     ready: '<success>READY</success>'
     cooldown: '<warning><seconds>s</warning>'
     unavailable: '<muted>—</muted>'
+    separator: ' <dark_gray>•</dark_gray> '
+    sense: '<secondary>◈</secondary> <accent><sense_kind></accent> <muted><sense_direction></muted> <text><sense_distance>m</text>'
+
+  sense:
+    kind:
+      movement: 'movement'
+      projectile: 'projectile'
+      combat: 'combat'
+      block: 'block'
+      action: 'action'
+      vibration: 'vibration'
+    direction:
+      near: 'nearby'
+      front: 'front'
+      front-right: 'front-right'
+      right: 'right'
+      back-right: 'back-right'
+      back: 'behind'
+      back-left: 'back-left'
+      left: 'left'
+      front-left: 'front-left'
 
   camera:
     mounted-free-look: 'mounted free-look'
