@@ -39,6 +39,8 @@ public final class PossessionSession {
     private volatile long guardianLaserDeadlineTick = Long.MIN_VALUE;
     private volatile long vexChargeUntilTick = Long.MIN_VALUE;
     private volatile long evokerCastUntilTick = Long.MIN_VALUE;
+    private volatile UUID frogTongueTargetId;
+    private volatile long frogTongueUntilTick = Long.MIN_VALUE;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
     private volatile CameraTransport cameraTransport = CameraTransport.NONE;
     private volatile boolean cameraTeleportInProgress;
@@ -204,6 +206,28 @@ public final class PossessionSession {
 
     public void clearEvokerCast() {
         evokerCastUntilTick = Long.MIN_VALUE;
+    }
+
+    public void startFrogTongue(UUID targetId, int ticks) {
+        frogTongueTargetId = targetId;
+        frogTongueUntilTick = controlTick + Math.max(1, ticks);
+    }
+
+    public boolean frogTongueTracked() {
+        return frogTongueUntilTick != Long.MIN_VALUE;
+    }
+
+    public boolean frogTongueExpired() {
+        return frogTongueTracked() && controlTick > frogTongueUntilTick;
+    }
+
+    public UUID frogTongueTargetId() {
+        return frogTongueTargetId;
+    }
+
+    public void clearFrogTongue() {
+        frogTongueTargetId = null;
+        frogTongueUntilTick = Long.MIN_VALUE;
     }
 
     public void markSpectatorShiftAttempt() {

@@ -63,6 +63,8 @@ messages:
   ability:
     dragon-fireball: 'дыхание дракона'
     shulker-bullet: 'снаряд шалкера'
+    shulker-shell: 'открыть / закрыть панцирь'
+    frog-melee-tongue: 'удар / Shift+ЛКМ язык'
     guardian-laser: 'лазер хранителя'
     fuse: 'взрыватель'
     arrow-melee: 'стрела / ближний бой'

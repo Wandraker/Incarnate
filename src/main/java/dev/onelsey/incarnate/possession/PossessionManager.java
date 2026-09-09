@@ -1,6 +1,7 @@
 package dev.onelsey.incarnate.possession;
 
 import dev.onelsey.incarnate.IncarnatePlugin;
+import dev.onelsey.incarnate.ability.AbilityGesture;
 import dev.onelsey.incarnate.ability.AbilityRegistry;
 import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.ViewSnapshot;
@@ -561,29 +562,14 @@ public final class PossessionManager {
     }
 
     public void triggerPrimary(Player player) {
-        PossessionSession session = session(player);
-        if (session == null || !session.isActive()) {
-            return;
-        }
-
-        Mob vessel = session.vessel();
-        ScheduledTask abilityTask = vessel.getScheduler().run(plugin, task -> {
-            if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
-                return;
-            }
-            try {
-                abilities.triggerPrimary(session);
-            } catch (Throwable ex) {
-                plugin.getLogger().log(Level.SEVERE, "Primary ability failed for " + vessel.getType() + " " + session.vesselId(), ex);
-                notifyPlayer(player, "ability-primary-failed");
-            }
-        }, null);
-        if (abilityTask == null && session.isActive()) {
-            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
-        }
+        triggerGesture(player, AbilityGesture.PRIMARY);
     }
 
     public void triggerSecondary(Player player) {
+        triggerGesture(player, AbilityGesture.SECONDARY);
+    }
+
+    public void triggerGesture(Player player, AbilityGesture gesture) {
         PossessionSession session = session(player);
         if (session == null || !session.isActive()) {
             return;
@@ -595,10 +581,12 @@ public final class PossessionManager {
                 return;
             }
             try {
-                abilities.triggerSecondary(session);
+                abilities.trigger(session, gesture);
             } catch (Throwable ex) {
-                plugin.getLogger().log(Level.SEVERE, "Secondary ability failed for " + vessel.getType() + " " + session.vesselId(), ex);
-                notifyPlayer(player, "ability-secondary-failed");
+                boolean secondary = gesture == AbilityGesture.SECONDARY;
+                String kind = secondary ? "Secondary" : "Primary";
+                plugin.getLogger().log(Level.SEVERE, kind + " ability gesture " + gesture + " failed for " + vessel.getType() + " " + session.vesselId(), ex);
+                notifyPlayer(player, secondary ? "ability-secondary-failed" : "ability-primary-failed");
             }
         }, null);
         if (abilityTask == null && session.isActive()) {

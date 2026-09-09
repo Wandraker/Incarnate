@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.0
+
+Native Behavior & State Fidelity update.
+
+- Added an ability-gesture dispatch layer instead of routing every left-click through one hardcoded primary path. `PRIMARY`, `SECONDARY`, `SNEAK_PRIMARY` and `SPRINT_PRIMARY` are now distinct actions, with non-specialized gestures falling back safely to the normal primary ability.
+- `Shift + left click` is enabled as a configurable gesture by default. This gives complex mobs room for additional actions without adding extra commands or client mods.
+- Added Frog tongue control through the native Paper `Frog#setTongueTarget` API. Frog normal left click remains melee; `Shift + left click` attempts the native tongue action against the aimed living entity. The action is range/region validated, bounded by a timeout and cleaned up if the target disappears.
+- Existing Frog tongue target state is captured for normal release. Interrupted-session recovery clears an orphaned tongue target rather than guessing a stale cross-region entity reference.
+- Added Shulker secondary shell control on `F`, toggling the real `peek` state. Shulker bullet firing no longer permanently forces the shell open, and the pre-possession peek value is still restored on release/recovery.
+- Added Sniffer state fidelity: the native `Sniffer.State` is captured before possession, normalized to `IDLING` while controlled, restored on normal release and persisted through interrupted-session recovery.
+- Bumped gameplay config schema to 3 and added non-destructive defaults for gesture input, Frog tongue and Shulker shell control.
+- Kept Warden sonic-boom manipulation out of this candidate. Public anger/disturbance APIs do not expose a complete restorable snapshot of the Warden's per-entity anger/Brain state, so Incarnate does not mutate that state merely to fake feature completeness.
+- This remains a CI/smoke-test candidate until live gameplay validates Frog tongue behavior with `aware=false`, Shulker shell/bullet feel and gesture input through both mounted and spectator-target camera transports.
+
 ## 0.5.0
 
 Complex Bodies foundation.

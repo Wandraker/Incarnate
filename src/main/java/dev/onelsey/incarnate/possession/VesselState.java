@@ -7,12 +7,15 @@ import org.bukkit.entity.Bat;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Frog;
 import org.bukkit.entity.Guardian;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Shulker;
+import org.bukkit.entity.Sniffer;
 import org.bukkit.entity.Sittable;
 import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.Vex;
@@ -41,7 +44,9 @@ public record VesselState(
     EnderDragon.Phase dragonPhase,
     Location dragonPodium,
     Float shulkerPeek,
-    BlockFace shulkerAttachedFace
+    BlockFace shulkerAttachedFace,
+    Entity frogTongueTarget,
+    Sniffer.State snifferState
 ) {
     public static VesselState capture(Mob mob) {
         Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
@@ -61,6 +66,8 @@ public record VesselState(
         Location dragonPodium = mob instanceof EnderDragon dragon ? dragon.getPodium().clone() : null;
         Float shulkerPeek = mob instanceof Shulker shulker ? shulker.getPeek() : null;
         BlockFace shulkerAttachedFace = mob instanceof Shulker shulker ? shulker.getAttachedFace() : null;
+        Entity frogTongueTarget = mob instanceof Frog frog ? frog.getTongueTarget() : null;
+        Sniffer.State snifferState = mob instanceof Sniffer sniffer ? sniffer.getState() : null;
 
         return new VesselState(
             mob.isAware(),
@@ -86,7 +93,9 @@ public record VesselState(
             dragonPhase,
             dragonPodium,
             shulkerPeek,
-            shulkerAttachedFace
+            shulkerAttachedFace,
+            frogTongueTarget,
+            snifferState
         );
     }
 
@@ -132,6 +141,12 @@ public record VesselState(
         if (mob instanceof Shulker shulker) {
             shulker.setVelocity(new org.bukkit.util.Vector());
             shulker.setGravity(false);
+        }
+        if (mob instanceof Frog frog) {
+            frog.setTongueTarget(null);
+        }
+        if (mob instanceof Sniffer sniffer) {
+            sniffer.setState(Sniffer.State.IDLING);
         }
     }
 
@@ -217,6 +232,19 @@ public record VesselState(
             if (shulkerPeek != null) {
                 shulker.setPeek(Math.max(0.0f, Math.min(1.0f, shulkerPeek)));
             }
+        }
+        if (mob instanceof Frog frog) {
+            if (frogTongueTarget != null
+                && Bukkit.isOwnedByCurrentRegion(frogTongueTarget)
+                && frogTongueTarget.isValid()
+                && frogTongueTarget.getWorld() == frog.getWorld()) {
+                frog.setTongueTarget(frogTongueTarget);
+            } else {
+                frog.setTongueTarget(null);
+            }
+        }
+        if (mob instanceof Sniffer sniffer && snifferState != null) {
+            sniffer.setState(snifferState);
         }
     }
 

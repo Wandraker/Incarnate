@@ -1,4 +1,4 @@
-config-version: 2
+config-version: 3
 
 control:
   max-possession-distance: 8.0
@@ -22,6 +22,11 @@ release-key:
 
 secondary-key:
   swap-offhand: true
+
+input:
+  gestures:
+    sneak-primary: true
+    sprint-primary: true
 
 admin:
   inspect-distance: 12.0
@@ -164,5 +169,14 @@ abilities:
     range: 24.0
     ray-size: 0.35
     cooldown-ticks: 40
+  shulker-shell:
+    enabled: true
+    cooldown-ticks: 6
+  frog-tongue:
+    enabled: true
+    range: 10.0
+    ray-size: 0.30
+    duration-ticks: 12
+    cooldown-ticks: 24
 
 excluded-types: []
