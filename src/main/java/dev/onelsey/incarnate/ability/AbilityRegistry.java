@@ -1,5 +1,6 @@
 package dev.onelsey.incarnate.ability;
 
+import com.destroystokyo.paper.entity.RangedEntity;
 import dev.onelsey.incarnate.input.ViewSnapshot;
 import dev.onelsey.incarnate.possession.PossessionSession;
 import org.bukkit.FluidCollisionMode;
@@ -13,13 +14,17 @@ import org.bukkit.entity.Breeze;
 import org.bukkit.entity.BreezeWindCharge;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
+import org.bukkit.entity.Drowned;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Ghast;
+import org.bukkit.entity.Illusioner;
 import org.bukkit.entity.LargeFireball;
 import org.bukkit.entity.Llama;
 import org.bukkit.entity.LlamaSpit;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Piglin;
+import org.bukkit.entity.Pillager;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.SmallFireball;
@@ -27,9 +32,11 @@ import org.bukkit.entity.Snowball;
 import org.bukkit.entity.Snowman;
 import org.bukkit.entity.Spider;
 import org.bukkit.entity.TraderLlama;
+import org.bukkit.entity.Witch;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.WitherSkull;
 import org.bukkit.inventory.EntityEquipment;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
@@ -41,6 +48,11 @@ public final class AbilityRegistry {
     private final boolean nativeProjectilesEnabled;
     private final double nativeProjectileSpeed;
     private final int nativeProjectileCooldownTicks;
+    private final boolean nativeRangedEnabled;
+    private final double nativeRangedRange;
+    private final double nativeRangedRaySize;
+    private final float nativeRangedCharge;
+    private final int nativeRangedCooldownTicks;
     private final boolean creeperEnabled;
     private final int creeperCooldownTicks;
     private final boolean meleeEnabled;
@@ -69,6 +81,11 @@ public final class AbilityRegistry {
         this.nativeProjectilesEnabled = config.getBoolean("abilities.native-projectiles.enabled", true);
         this.nativeProjectileSpeed = config.getDouble("abilities.native-projectiles.speed", 1.5);
         this.nativeProjectileCooldownTicks = Math.max(1, config.getInt("abilities.native-projectiles.cooldown-ticks", 14));
+        this.nativeRangedEnabled = config.getBoolean("abilities.native-ranged.enabled", true);
+        this.nativeRangedRange = Math.max(2.0, config.getDouble("abilities.native-ranged.range", 24.0));
+        this.nativeRangedRaySize = Math.max(0.0, config.getDouble("abilities.native-ranged.ray-size", 0.35));
+        this.nativeRangedCharge = (float) Math.max(0.0, Math.min(1.0, config.getDouble("abilities.native-ranged.charge", 1.0)));
+        this.nativeRangedCooldownTicks = Math.max(1, config.getInt("abilities.native-ranged.cooldown-ticks", 20));
         this.creeperEnabled = config.getBoolean("abilities.creeper.enabled", true);
         this.creeperCooldownTicks = Math.max(1, config.getInt("abilities.creeper.cooldown-ticks", 5));
         this.meleeEnabled = config.getBoolean("abilities.melee.enabled", true);
@@ -107,6 +124,11 @@ public final class AbilityRegistry {
         }
         if (nativeProjectilesEnabled && projectileFor(vessel) != null) {
             return shootNativeProjectile(session, vessel);
+        }
+        if (nativeRangedEnabled && vessel instanceof RangedEntity ranged && supportsNativeRanged(vessel)) {
+            if (nativeRanged(session, vessel, ranged)) {
+                return true;
+            }
         }
         return melee(session, vessel);
     }
@@ -160,33 +182,48 @@ public final class AbilityRegistry {
         return true;
     }
 
+    private boolean nativeRanged(PossessionSession session, Mob vessel, RangedEntity ranged) {
+        if (!hasRequiredRangedWeapon(vessel)) {
+            return false;
+        }
+
+        LivingEntity target = findLivingTarget(session, vessel, nativeRangedRange, nativeRangedRaySize);
+        if (target == null || !session.acquirePrimaryCooldown(nativeRangedCooldownTicks)) {
+            return false;
+        }
+
+        ranged.rangedAttack(target, nativeRangedCharge);
+        return true;
+    }
+
     private boolean melee(PossessionSession session, Mob vessel) {
         if (!meleeEnabled) {
             return false;
         }
 
-        Vector direction = direction(session.view());
-        RayTraceResult hit = vessel.getWorld().rayTrace(
-            vessel.getEyeLocation(),
-            direction,
-            meleeRange,
-            FluidCollisionMode.NEVER,
-            true,
-            meleeRaySize,
-            entity -> entity instanceof LivingEntity
-                && !entity.getUniqueId().equals(vessel.getUniqueId())
-                && (!(entity instanceof Player player) || !player.getUniqueId().equals(session.playerId()))
-        );
-        if (hit == null || hit.getHitEntity() == null) {
-            return false;
-        }
-        if (!session.acquirePrimaryCooldown(meleeCooldownTicks)) {
+        LivingEntity target = findLivingTarget(session, vessel, meleeRange, meleeRaySize);
+        if (target == null || !session.acquirePrimaryCooldown(meleeCooldownTicks)) {
             return false;
         }
 
         vessel.swingMainHand();
-        vessel.attack(hit.getHitEntity());
+        vessel.attack(target);
         return true;
+    }
+
+    private LivingEntity findLivingTarget(PossessionSession session, Mob vessel, double range, double raySize) {
+        RayTraceResult hit = vessel.getWorld().rayTrace(
+            vessel.getEyeLocation(),
+            direction(session.view()),
+            range,
+            FluidCollisionMode.NEVER,
+            true,
+            raySize,
+            entity -> entity instanceof LivingEntity
+                && !entity.getUniqueId().equals(vessel.getUniqueId())
+                && (!(entity instanceof Player player) || !player.getUniqueId().equals(session.playerId()))
+        );
+        return hit != null && hit.getHitEntity() instanceof LivingEntity living ? living : null;
     }
 
     private boolean teleportEnderman(PossessionSession session, Enderman enderman) {
@@ -261,6 +298,40 @@ public final class AbilityRegistry {
         session.lockMovementControl(camelDashLockTicks);
         camel.setVelocity(horizontal);
         return true;
+    }
+
+    private static boolean supportsNativeRanged(Mob vessel) {
+        return vessel instanceof Pillager
+            || vessel instanceof Piglin
+            || vessel instanceof Drowned
+            || vessel instanceof Witch
+            || vessel instanceof Illusioner;
+    }
+
+    private static boolean hasRequiredRangedWeapon(Mob vessel) {
+        if (vessel instanceof Witch) {
+            return true;
+        }
+        if (vessel instanceof Pillager || vessel instanceof Piglin) {
+            return holds(vessel, Material.CROSSBOW);
+        }
+        if (vessel instanceof Drowned) {
+            return holds(vessel, Material.TRIDENT);
+        }
+        if (vessel instanceof Illusioner) {
+            return holds(vessel, Material.BOW);
+        }
+        return false;
+    }
+
+    private static boolean holds(Mob vessel, Material material) {
+        EntityEquipment equipment = vessel.getEquipment();
+        if (equipment == null) {
+            return false;
+        }
+        ItemStack main = equipment.getItemInMainHand();
+        ItemStack off = equipment.getItemInOffHand();
+        return main.getType() == material || off.getType() == material;
     }
 
     private static Location findEndermanLanding(Location target) {
