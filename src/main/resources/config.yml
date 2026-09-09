@@ -15,12 +15,6 @@ admin:
 visibility:
   hide-controller-from-tab: true
 
-integrations:
-  elysium-private-tag:
-    enabled: true
-    plugin-name: Elysium_Private_Tag
-    source: Incarnate
-
 created-vessels:
   remove-on-release: true
   remove-orphaned-after-recovery: true

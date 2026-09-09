@@ -11,9 +11,6 @@ Native Abilities Update.
 - Added active-ability ticking on the vessel EntityScheduler, separate from movement-controller failure handling.
 - Possession acquisition now tells the controller the actual primary and secondary actions available for that body.
 - Guardian pre-possession laser state is restored on normal release when its original target is still safely restorable; interrupted recovery cancels orphaned laser state rather than guessing a target.
-- Added optional Elysium Private Tag V4.1+ integration. Incarnate uses its source-aware `hideTag/showTag(Player, String)` API with source `Incarnate`, suppressing the player's overhead tag for the full possession/recovery lifecycle and removing only Incarnate's own suppression on release.
-- Stale Incarnate tag suppression is cleared for already-online players after plugin reload, while full server crashes remain safe because Private Tag suppression is in-memory and Incarnate player recovery re-runs on startup.
-- Declared Elysium Private Tag as a soft dependency only; Incarnate keeps working normally when it is absent or disabled.
 - CI smoke tests now derive the plugin version from plugin.yml/JAR metadata instead of hardcoding the previous release number.
 - Retains default-deny create/possess/per-mob permissions and unrestricted emergency `/release`.
 

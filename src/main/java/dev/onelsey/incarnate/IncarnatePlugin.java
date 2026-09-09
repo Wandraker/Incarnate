@@ -4,7 +4,6 @@ import dev.onelsey.incarnate.ability.AbilityRegistry;
 import dev.onelsey.incarnate.command.IncarnateCommand;
 import dev.onelsey.incarnate.command.PossessCommand;
 import dev.onelsey.incarnate.command.ReleaseCommand;
-import dev.onelsey.incarnate.integration.ElysiumPrivateTagIntegration;
 import dev.onelsey.incarnate.listener.SessionListener;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
 import dev.onelsey.incarnate.possession.PossessionManager;
@@ -28,8 +27,7 @@ public final class IncarnatePlugin extends JavaPlugin {
         ControllerRegistry controllers = new ControllerRegistry(getConfig());
         AbilityRegistry abilities = new AbilityRegistry(getConfig());
         PossessionVisibilityManager visibility = new PossessionVisibilityManager(this);
-        ElysiumPrivateTagIntegration privateTags = new ElysiumPrivateTagIntegration(this);
-        possessions = new PossessionManager(this, controllers, abilities, visibility, privateTags, excluded);
+        possessions = new PossessionManager(this, controllers, abilities, visibility, excluded);
 
         IncarnateCommand incarnateCommand = new IncarnateCommand(
             possessions,
@@ -45,7 +43,6 @@ public final class IncarnatePlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new SessionListener(this, possessions), this);
         possessions.recoverIndexedVessels();
-        privateTags.recoverStaleOnlineSuppressions();
         possessions.recoverAlreadyOnlinePlayers();
         visibility.recoverStaleTabEntries();
         getLogger().info("Incarnate " + getPluginMeta().getVersion() + " enabled for Minecraft 26.2+ (Paper/Purpur/Leaf/Folia).");
