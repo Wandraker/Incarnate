@@ -8,7 +8,11 @@ import org.bukkit.entity.Mob;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.Set;
+import java.util.UUID;
+
 public final class VesselRecoveryStore {
+    private final VesselRecoveryIndex index;
     private final NamespacedKey activeKey;
     private final NamespacedKey originKey;
     private final NamespacedKey awareKey;
@@ -22,6 +26,7 @@ public final class VesselRecoveryStore {
     private final NamespacedKey creeperFuseTicksKey;
 
     public VesselRecoveryStore(IncarnatePlugin plugin) {
+        this.index = new VesselRecoveryIndex(plugin);
         this.activeKey = new NamespacedKey(plugin, "vessel_recovery_active");
         this.originKey = new NamespacedKey(plugin, "vessel_recovery_origin");
         this.awareKey = new NamespacedKey(plugin, "vessel_recovery_aware");
@@ -32,26 +37,41 @@ public final class VesselRecoveryStore {
         this.gravityKey = new NamespacedKey(plugin, "vessel_recovery_gravity");
         this.batAwakeKey = new NamespacedKey(plugin, "vessel_recovery_bat_awake");
         this.creeperIgnitedKey = new NamespacedKey(plugin, "vessel_recovery_creeper_ignited");
+        this.creperFuseTicksKey = null;
         this.creeperFuseTicksKey = new NamespacedKey(plugin, "vessel_recovery_creeper_fuse_ticks");
     }
 
     public void save(Mob mob, PossessionOrigin origin, VesselState state) {
-        PersistentDataContainer data = mob.getPersistentDataContainer();
-        data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
-        data.set(originKey, PersistentDataType.STRING, origin.name());
-        data.set(awareKey, PersistentDataType.BYTE, bool(state.aware()));
-        data.set(aiKey, PersistentDataType.BYTE, bool(state.ai()));
-        data.set(persistentKey, PersistentDataType.BYTE, bool(state.persistent()));
-        data.set(removeFarKey, PersistentDataType.BYTE, bool(state.removeWhenFarAway()));
-        data.set(aggressiveKey, PersistentDataType.BYTE, bool(state.aggressive()));
-        data.set(gravityKey, PersistentDataType.BYTE, bool(state.gravity()));
-        setNullableBool(data, batAwakeKey, state.batAwake());
-        setNullableBool(data, creeperIgnitedKey, state.creeperIgnited());
-        if (state.creeperFuseTicks() != null) {
-            data.set(creeperFuseTicksKey, PersistentDataType.INTEGER, state.creeperFuseTicks());
-        } else {
-            data.remove(creeperFuseTicksKey);
+        UUID vesselId = mob.getUniqueId();
+        if (!index.mark(vesselId)) {
+            throw new IllegalStateException("Could not persist recovery index for vessel " + vesselId);
         }
+
+        try {
+            PersistentDataContainer data = mob.getPersistentDataContainer();
+            data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
+            data.set(originKey, PersistentDataType.STRING, origin.name());
+            data.set(awareKey, PersistentDataType.BYTE, bool(state.aware()));
+            data.set(aiKey, PersistentDataType.BYTE, bool(state.ai()));
+            data.set(persistentKey, PersistentDataType.BYTE, bool(state.persistent()));
+            data.set(removeFarKey, PersistentDataType.BYTE, bool(state.removeWhenFarAway()));
+            data.set(aggressiveKey, PersistentDataType.BYTE, bool(state.aggressive()));
+            data.set(gravityKey, PersistentDataType.BYTE, bool(state.gravity()));
+            setNullableBool(data, batAwakeKey, state.batAwake());
+            setNullableBool(data, creeperIgnitedKey, state.creeperIgnited());
+            if (state.creeperFuseTicks() != null) {
+                data.set(creeperFuseTicksKey, PersistentDataType.INTEGER, state.creeperFuseTicks());
+            } else {
+                data.remove(creeperFuseTicksKey);
+            }
+        } catch (RuntimeException ex) {
+            index.forget(vesselId);
+            throw ex;
+        }
+    }
+
+    public Set<UUID> indexedVessels() {
+        return index.snapshot();
     }
 
     public boolean isMarked(Mob mob) {
@@ -60,7 +80,9 @@ public final class VesselRecoveryStore {
     }
 
     public boolean recoverOrphan(Mob mob, boolean removeOrphanedCreated) {
+        UUID vesselId = mob.getUniqueId();
         if (!isMarked(mob)) {
+            index.forget(vesselId);
             return false;
         }
 
@@ -103,6 +125,7 @@ public final class VesselRecoveryStore {
     }
 
     public void clear(Mob mob) {
+        UUID vesselId = mob.getUniqueId();
         PersistentDataContainer data = mob.getPersistentDataContainer();
         data.remove(activeKey);
         data.remove(originKey);
@@ -115,6 +138,7 @@ public final class VesselRecoveryStore {
         data.remove(batAwakeKey);
         data.remove(creeperIgnitedKey);
         data.remove(creeperFuseTicksKey);
+        index.forget(vesselId);
     }
 
     private static byte bool(boolean value) {
