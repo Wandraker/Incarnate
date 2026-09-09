@@ -55,6 +55,15 @@ jobs:
         with:
           gradle-version: '9.6.1'
 
+      - name: Resolve plugin version
+        id: plugin-meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/^version: //p' src/main/resources/plugin.yml | head -n1 | tr -d "'\"")
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Build plugin jar
         run: gradle clean jar --stacktrace --warning-mode all
 
@@ -72,8 +81,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PLUGIN_VERSION=$(sed -n 's/^version: //p' src/main/resources/plugin.yml | head -n1 | tr -d "'\"")
-          test -n "$PLUGIN_VERSION"
+          PLUGIN_VERSION='${{ steps.plugin-meta.outputs.version }}'
           PLUGIN_JAR="build/libs/Incarnate-${PLUGIN_VERSION}.jar"
           test -f "$PLUGIN_JAR"
 
@@ -154,7 +162,7 @@ jobs:
       - name: Upload validated Incarnate JAR
         uses: actions/upload-artifact@v4
         with:
-          name: Incarnate-0.2.0
-          path: build/libs/Incarnate-0.2.0.jar
+          name: Incarnate-${{ steps.plugin-meta.outputs.version }}
+          path: build/libs/Incarnate-${{ steps.plugin-meta.outputs.version }}.jar
           if-no-files-found: error
           retention-days: 30
