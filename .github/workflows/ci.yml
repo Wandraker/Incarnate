@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: incarnate-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   compile:
     runs-on: ubuntu-latest
@@ -35,7 +39,7 @@ jobs:
   paper-smoke:
     needs: compile
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -64,7 +68,7 @@ jobs:
           test -n "$PAPER_URL"
           curl -fsSL -H "User-Agent: ${USER_AGENT}" -o paper.jar "$PAPER_URL"
 
-      - name: Start Paper and verify Incarnate startup
+      - name: Verify Paper startup and shutdown lifecycle
         shell: bash
         run: |
           set -euo pipefail
@@ -72,15 +76,67 @@ jobs:
           cp build/libs/Incarnate-0.1.0.jar ci-server/plugins/Incarnate.jar
           cp paper.jar ci-server/paper.jar
           printf 'eula=true\n' > ci-server/eula.txt
-          set +e
-          (cd ci-server && timeout 90s java -Xms768M -Xmx1536M -jar paper.jar --nogui) > paper-smoke.log 2>&1
-          EXIT_CODE=$?
-          set -e
-          cat paper-smoke.log
-          if [ "$EXIT_CODE" -ne 0 ] && [ "$EXIT_CODE" -ne 124 ]; then
-            exit "$EXIT_CODE"
+
+          cd ci-server
+          java -Xms768M -Xmx1536M -jar paper.jar --nogui > ../paper-smoke.log 2>&1 &
+          SERVER_PID=$!
+          cd ..
+
+          cleanup() {
+            if kill -0 "$SERVER_PID" 2>/dev/null; then
+              kill -TERM "$SERVER_PID" 2>/dev/null || true
+              sleep 2
+            fi
+            if kill -0 "$SERVER_PID" 2>/dev/null; then
+              kill -KILL "$SERVER_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          ENABLED=0
+          for _ in $(seq 1 90); do
+            if grep -Fq 'Incarnate 0.1.0 enabled for Minecraft 26.2+' paper-smoke.log 2>/dev/null; then
+              ENABLED=1
+              break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo 'Paper exited before Incarnate enabled.'
+              cat paper-smoke.log || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ENABLED" -ne 1 ]; then
+            echo 'Timed out waiting for Incarnate to enable.'
+            cat paper-smoke.log || true
+            exit 1
           fi
+
+          kill -TERM "$SERVER_PID"
+
+          STOPPED=0
+          for _ in $(seq 1 35); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              STOPPED=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$STOPPED" -ne 1 ]; then
+            echo 'Paper did not stop cleanly after SIGTERM.'
+            cat paper-smoke.log || true
+            exit 1
+          fi
+
+          wait "$SERVER_PID" || true
+          trap - EXIT
+          cat paper-smoke.log
+
           grep -F 'Incarnate 0.1.0 enabled for Minecraft 26.2+' paper-smoke.log
-          if grep -E 'Error occurred while enabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate' paper-smoke.log; then
+          grep -F 'Disabling Incarnate v0.1.0' paper-smoke.log
+
+          if grep -E 'Error occurred while enabling Incarnate|Error occurred while disabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate|IllegalPluginAccessException' paper-smoke.log; then
             exit 1
           fi
