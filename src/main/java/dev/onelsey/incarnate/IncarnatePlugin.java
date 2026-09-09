@@ -29,7 +29,10 @@ public final class IncarnatePlugin extends JavaPlugin {
         PossessionVisibilityManager visibility = new PossessionVisibilityManager(this);
         possessions = new PossessionManager(this, controllers, abilities, visibility, excluded);
 
-        IncarnateCommand incarnateCommand = new IncarnateCommand(possessions);
+        IncarnateCommand incarnateCommand = new IncarnateCommand(
+            possessions,
+            getConfig().getDouble("admin.inspect-distance", 12.0)
+        );
         Objects.requireNonNull(getCommand("incarnate")).setExecutor(incarnateCommand);
         Objects.requireNonNull(getCommand("incarnate")).setTabCompleter(incarnateCommand);
         Objects.requireNonNull(getCommand("possess")).setExecutor(new PossessCommand(
