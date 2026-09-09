@@ -117,7 +117,7 @@ public final class PossessionSession {
     }
 
     public boolean isMovementControlLocked() {
-        return movementControlLockedUntilTick != Long.MIN_VALUE && controlTick < movementControlLockedUntilTick;
+        return movementControlLockedUntilTick != Long.MIN_VALUE && controlTick <= movementControlLockedUntilTick;
     }
 
     public void markSpectatorShiftAttempt() {
