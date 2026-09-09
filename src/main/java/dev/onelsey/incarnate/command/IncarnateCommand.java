@@ -1,5 +1,6 @@
 package dev.onelsey.incarnate.command;
 
+import dev.onelsey.incarnate.permission.IncarnatePermissions;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionOrigin;
 import dev.onelsey.incarnate.possession.PossessionSession;
@@ -24,9 +25,6 @@ import java.util.List;
 import java.util.Locale;
 
 public final class IncarnateCommand implements CommandExecutor, TabCompleter {
-    private static final String MORPH_PERMISSION = "incarnate.use.incarnate";
-    private static final String INSPECT_PERMISSION = "incarnate.admin.inspect";
-
     private final PossessionManager possessions;
     private final double inspectDistance;
 
@@ -61,7 +59,7 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (!player.hasPermission(MORPH_PERMISSION)) {
+        if (!player.hasPermission(IncarnatePermissions.CREATE)) {
             player.sendMessage(Component.text("[Incarnate] You do not have permission to create a vessel."));
             return true;
         }
@@ -80,6 +78,10 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
 
         if (!possessions.canCreate(type)) {
             player.sendMessage(Component.text("[Incarnate] " + type + " cannot be used as a created vessel in this build."));
+            return true;
+        }
+        if (!IncarnatePermissions.canUseMob(player, type)) {
+            player.sendMessage(Component.text("[Incarnate] You do not have access to the " + type + " vessel."));
             return true;
         }
 
@@ -103,7 +105,7 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
     }
 
     private void inspect(Player player) {
-        if (!player.hasPermission(INSPECT_PERMISSION)) {
+        if (!player.hasPermission(IncarnatePermissions.INSPECT)) {
             player.sendMessage(Component.text("[Incarnate] You do not have permission to inspect vessels."));
             return;
         }
@@ -155,13 +157,15 @@ public final class IncarnateCommand implements CommandExecutor, TabCompleter {
                 out.add("secondary");
             }
         }
-        if (sender.hasPermission(INSPECT_PERMISSION) && "INSPECT".startsWith(prefix)) {
+        if (sender.hasPermission(IncarnatePermissions.INSPECT) && "INSPECT".startsWith(prefix)) {
             out.add("inspect");
         }
 
-        if (sender.hasPermission(MORPH_PERMISSION)) {
+        if (sender instanceof Player player && player.hasPermission(IncarnatePermissions.CREATE)) {
             for (EntityType type : Registry.ENTITY_TYPE) {
-                if (!possessions.canCreate(type) || !type.name().startsWith(prefix)) {
+                if (!possessions.canCreate(type)
+                    || !IncarnatePermissions.canUseMob(player, type)
+                    || !type.name().startsWith(prefix)) {
                     continue;
                 }
                 out.add(type.name().toLowerCase(Locale.ROOT));
