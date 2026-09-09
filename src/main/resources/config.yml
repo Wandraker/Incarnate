@@ -1,4 +1,4 @@
-config-version: 1
+config-version: 2
 
 control:
   max-possession-distance: 8.0
@@ -79,6 +79,15 @@ movement:
     hop-interval-ticks: 6
     idle-damping: 0.72
     hurt-input-control: 0.25
+  dragon:
+    speed: 0.48
+    sprint-multiplier: 1.35
+    acceleration: 0.42
+    idle-damping: 0.78
+    hurt-input-control: 0.35
+  shulker:
+    step-interval-ticks: 5
+    allow-vertical-wall-crawl: true
 
 abilities:
   skeleton:
@@ -146,7 +155,14 @@ abilities:
     cast-ticks: 20
     attack-delay-step: 2
     ground-search-blocks: 3
+  dragon-fireball:
+    enabled: true
+    speed: 1.35
+    cooldown-ticks: 30
+  shulker-bullet:
+    enabled: true
+    range: 24.0
+    ray-size: 0.35
+    cooldown-ticks: 40
 
-excluded-types:
-  - ENDER_DRAGON
-  - SHULKER
+excluded-types: []

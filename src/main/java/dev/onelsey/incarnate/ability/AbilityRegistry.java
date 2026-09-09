@@ -18,6 +18,8 @@ import org.bukkit.entity.BreezeWindCharge;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Drowned;
+import org.bukkit.entity.DragonFireball;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Evoker;
 import org.bukkit.entity.EvokerFangs;
@@ -38,6 +40,8 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.entity.SmallFireball;
 import org.bukkit.entity.Snowball;
 import org.bukkit.entity.Snowman;
+import org.bukkit.entity.Shulker;
+import org.bukkit.entity.ShulkerBullet;
 import org.bukkit.entity.Spider;
 import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.TraderLlama;
@@ -106,6 +110,13 @@ public final class AbilityRegistry {
     private final int evokerFangsCastTicks;
     private final int evokerFangsAttackDelayStep;
     private final int evokerFangsGroundSearchBlocks;
+    private final boolean dragonFireballEnabled;
+    private final double dragonFireballSpeed;
+    private final int dragonFireballCooldownTicks;
+    private final boolean shulkerBulletEnabled;
+    private final double shulkerBulletRange;
+    private final double shulkerBulletRaySize;
+    private final int shulkerBulletCooldownTicks;
 
     public AbilityRegistry(FileConfiguration config) {
         this.skeletonEnabled = config.getBoolean("abilities.skeleton.enabled", true);
@@ -160,6 +171,13 @@ public final class AbilityRegistry {
         this.evokerFangsCastTicks = Math.max(1, config.getInt("abilities.evoker-fangs.cast-ticks", 20));
         this.evokerFangsAttackDelayStep = Math.max(0, config.getInt("abilities.evoker-fangs.attack-delay-step", 2));
         this.evokerFangsGroundSearchBlocks = Math.max(1, Math.min(8, config.getInt("abilities.evoker-fangs.ground-search-blocks", 3)));
+        this.dragonFireballEnabled = config.getBoolean("abilities.dragon-fireball.enabled", true);
+        this.dragonFireballSpeed = Math.max(0.1, config.getDouble("abilities.dragon-fireball.speed", 1.35));
+        this.dragonFireballCooldownTicks = Math.max(1, config.getInt("abilities.dragon-fireball.cooldown-ticks", 30));
+        this.shulkerBulletEnabled = config.getBoolean("abilities.shulker-bullet.enabled", true);
+        this.shulkerBulletRange = Math.max(2.0, config.getDouble("abilities.shulker-bullet.range", 24.0));
+        this.shulkerBulletRaySize = Math.max(0.0, config.getDouble("abilities.shulker-bullet.ray-size", 0.35));
+        this.shulkerBulletCooldownTicks = Math.max(1, config.getInt("abilities.shulker-bullet.cooldown-ticks", 40));
     }
 
     public boolean triggerPrimary(PossessionSession session) {
@@ -168,6 +186,12 @@ public final class AbilityRegistry {
             return false;
         }
 
+        if (vessel instanceof EnderDragon dragon && dragonFireballEnabled) {
+            return shootDragonFireball(session, dragon);
+        }
+        if (vessel instanceof Shulker shulker && shulkerBulletEnabled) {
+            return shootShulkerBullet(session, shulker);
+        }
         if (vessel instanceof Guardian guardian && guardianLaserEnabled) {
             return startGuardianLaser(session, guardian);
         }
@@ -258,6 +282,8 @@ public final class AbilityRegistry {
     }
 
     public String primaryLabel(Mob vessel) {
+        if (vessel instanceof EnderDragon && dragonFireballEnabled) return "dragon-fireball";
+        if (vessel instanceof Shulker && shulkerBulletEnabled) return "shulker-bullet";
         if (vessel instanceof Guardian && guardianLaserEnabled) return "guardian-laser";
         if (vessel instanceof Creeper && creeperEnabled) return "fuse";
         if (vessel instanceof AbstractSkeleton && skeletonEnabled) return "arrow-melee";
@@ -275,6 +301,28 @@ public final class AbilityRegistry {
         if (vessel instanceof Camel && camelDashEnabled) return "dash";
         if (vessel instanceof Ravager && ravagerRoarEnabled) return "roar";
         return "none";
+    }
+
+    private boolean shootDragonFireball(PossessionSession session, EnderDragon dragon) {
+        if (!session.acquirePrimaryCooldown(dragonFireballCooldownTicks)) {
+            return false;
+        }
+        Vector velocity = direction(session.view()).multiply(dragonFireballSpeed);
+        dragon.launchProjectile(DragonFireball.class, velocity);
+        return true;
+    }
+
+    private boolean shootShulkerBullet(PossessionSession session, Shulker shulker) {
+        LivingEntity target = findLivingTarget(session, shulker, shulkerBulletRange, shulkerBulletRaySize);
+        if (target == null || !session.acquirePrimaryCooldown(shulkerBulletCooldownTicks)) {
+            return false;
+        }
+        shulker.setPeek(1.0f);
+        shulker.getWorld().spawn(shulker.getEyeLocation(), ShulkerBullet.class, bullet -> {
+            bullet.setShooter(shulker);
+            bullet.setTarget(target);
+        });
+        return true;
     }
 
     private boolean startGuardianLaser(PossessionSession session, Guardian guardian) {

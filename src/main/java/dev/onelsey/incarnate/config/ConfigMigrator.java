@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 public final class ConfigMigrator {
-    private static final int CURRENT_SCHEMA = 1;
+    private static final int CURRENT_SCHEMA = 2;
 
     private ConfigMigrator() {
     }
@@ -35,6 +35,7 @@ public final class ConfigMigrator {
 
         YamlConfiguration defaults = loadResource(plugin, "config.yml");
         boolean changed = mergeMissing(user, defaults);
+        changed |= migrateSchema(user, schema);
 
         if (changed) {
             backup(configFile);
@@ -42,6 +43,24 @@ public final class ConfigMigrator {
             plugin.getLogger().info("Updated config.yml with new Incarnate defaults without replacing existing values. A backup was created.");
         }
         plugin.reloadConfig();
+    }
+
+    static boolean migrateSchema(YamlConfiguration target, int sourceSchema) {
+        boolean changed = false;
+        if (sourceSchema < 2) {
+            java.util.List<String> excluded = target.getStringList("excluded-types");
+            if (excluded.size() == 2
+                && excluded.stream().map(value -> value.toUpperCase(java.util.Locale.ROOT)).collect(java.util.stream.Collectors.toSet())
+                    .equals(java.util.Set.of("ENDER_DRAGON", "SHULKER"))) {
+                target.set("excluded-types", java.util.List.of());
+                changed = true;
+            }
+        }
+        if (target.getInt("config-version", 0) != CURRENT_SCHEMA) {
+            target.set("config-version", CURRENT_SCHEMA);
+            changed = true;
+        }
+        return changed;
     }
 
     static boolean mergeMissing(YamlConfiguration target, YamlConfiguration defaults) {

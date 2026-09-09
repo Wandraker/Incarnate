@@ -51,7 +51,7 @@ Examples:
 - `incarnate.mob.enderman`
 - `incarnate.mob.zombie_villager`
 
-`incarnate.mob.*` grants all currently supported mob types. Explicitly excluded types such as Ender Dragon and Shulker remain unavailable even with the wildcard.
+`incarnate.mob.*` grants all currently supported mob types. Server owners can still deny any supported type through `excluded-types`.
 
 This permission model is suitable for ranks or donor perks. Per-mob checks are enforced in both commands and the possession core, and `/incarnate` tab completion only exposes forms the player can actually use.
 
@@ -94,13 +94,13 @@ When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible 
 
 This means tuned movement speeds, cooldowns, camera choices, release behavior, excluded mobs and other existing settings are not reset merely because a later release adds new options.
 
-## What 0.4.0 implements
+## What 0.5.0 implements
 
 ### Real bodies
 
 Existing possession keeps the same Mob UUID and preserves its equipment/state. Created incarnation spawns a real Mob and removes it on release by default.
 
-Ender Dragon and Shulker are deliberately excluded.
+Ender Dragon and Shulker now use dedicated complex-body controllers and are enabled by default. They can still be disabled through `excluded-types`.
 
 ### Free-look camera
 
@@ -123,7 +123,7 @@ The mounted camera still requires live client testing across representative mob 
 
 ### Possession HUD
 
-0.4.0 adds a localized actionbar HUD while possession is active. By default it shows:
+The localized actionbar HUD remains active while possession is active. By default it shows:
 
 - the real Mob body's current and maximum health;
 - the localized left-click ability;
@@ -163,9 +163,11 @@ Dedicated controllers exist for:
 - amphibious mobs;
 - Rabbit and Frog hopping;
 - Spider / Cave Spider climbing;
-- Slime, Magma Cube and Sulfur Cube hopping.
+- Slime, Magma Cube and Sulfur Cube hopping;
+- Ender Dragon 3D flight under a forced native `HOVER` phase;
+- Shulker attachment-surface crawling.
 
-Ground bodies use real `MOVEMENT_SPEED` and `JUMP_STRENGTH` where available. Flying bodies use real `FLYING_SPEED` where available. Unknown/future Mob types fall back to ground movement.
+Ground bodies use real `MOVEMENT_SPEED` and `JUMP_STRENGTH` where available. Ordinary flying bodies use real `FLYING_SPEED` where available. Ender Dragon and Shulker bypass those generic families because their vanilla movement models require dedicated control. Unknown/future Mob types still fall back to ground movement.
 
 Burst abilities use a short movement-control lock so normal WASD processing does not immediately erase their physical impulse.
 
@@ -185,6 +187,8 @@ Implemented:
 - Llama / Trader Llama - Llama Spit;
 - Breeze - Breeze Wind Charge;
 - Guardian / Elder Guardian - real charging Guardian laser using a bounded vanilla Guardian attack-goal window;
+- Ender Dragon - real `DragonFireball`;
+- Shulker - real homing `ShulkerBullet` targeting the aimed living entity;
 - Creeper - real fuse toggle;
 - Pillager / Piglin - native ranged attack with crossbow;
 - Drowned - native ranged attack with trident;
@@ -192,6 +196,14 @@ Implemented:
 - Witch - native ranged attack through the Mob implementation.
 
 Other mobs use a real Mob melee attack when a living target is under the vessel crosshair.
+
+### Complex bodies
+
+Ender Dragon is controlled differently from ordinary flying mobs. Incarnate forces the native `HOVER` phase during possession so the vanilla dragon phase controller cannot steer it back toward a portal/podium while the player is in control. The original phase and podium are restored for an existing dragon. If a created dragon is explicitly configured to remain after release, Incarnate leaves it in `HOVER` at its current position rather than reactivating a default podium flight path.
+
+Shulker remains an attached body rather than becoming a generic walker. WASD moves it cell-by-cell along its current support surface; on wall attachments, jump/sneak can crawl vertically. Candidate cells and support blocks must belong to the current Folia region and be physically usable before the move is accepted.
+
+Both complex-body implementations require live gameplay validation before 0.5.0 is considered gameplay-final.
 
 ### Secondary abilities
 
@@ -221,7 +233,7 @@ Incarnate therefore does not currently expose Goat ram rather than leaving a pos
 
 Before taking over an existing Mob, Incarnate stores its original AI/awareness/persistence/despawn/aggressive/gravity and relevant special state in PDC. Interrupted sessions can recover marked vessels when they load again. Created orphan vessels are removed by default.
 
-Special-state restoration includes sitting state, Bat awake state, Camel dash, Creeper ignition/fuse progress, Guardian laser handling, PufferFish puff state, Vex charging state, Ravager attack/stun/roar ticks and the current Spellcaster spell state used by Evoker/other spellcasters.
+Special-state restoration includes sitting state, Bat awake state, Camel dash, Creeper ignition/fuse progress, Guardian laser handling, PufferFish puff state, Vex charging state, Ravager attack/stun/roar ticks, the current Spellcaster spell state, Ender Dragon phase/podium, and Shulker peek/attachment face.
 
 On normal release, a pre-possession combat target is restored only when it is still alive and safely owned by the same Folia region.
 
@@ -229,7 +241,7 @@ The Player's original game mode, flight permission/state, fly speed, world, loca
 
 ### AI suppression note
 
-0.4.0 keeps the real Mob AI flag enabled but normally sets a controlled body to unaware. This is currently the safest public-API approach to suppress autonomous pathfinding without making the entity immobile, but Paper notes that unaware mobs can also lose some autonomous/environmental behavior.
+Incarnate keeps the real Mob AI flag enabled but normally sets a controlled body to unaware. This is currently the safest public-API approach to suppress autonomous pathfinding without making the entity immobile, but Paper notes that unaware mobs can also lose some autonomous/environmental behavior.
 
 Abilities that genuinely need vanilla AI are handled narrowly. Guardian laser temporarily enables awareness only for its bounded attack window with a locked target/movement policy, then returns the body to unaware. Evoker fangs do not require enabling autonomous AI; Incarnate creates the real fang entities directly while using the Evoker's native spell state for presentation.
 

@@ -61,6 +61,8 @@ messages:
     region-join-failed: 'The controller and vessel could not be joined on a safe entity region.'
 
   ability:
+    dragon-fireball: 'dragon fireball'
+    shulker-bullet: 'shulker bullet'
     guardian-laser: 'guardian laser'
     fuse: 'fuse'
     arrow-melee: 'arrow / melee'

@@ -1,14 +1,18 @@
 package dev.onelsey.incarnate.possession;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Guardian;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Ravager;
+import org.bukkit.entity.Shulker;
 import org.bukkit.entity.Sittable;
 import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.Vex;
@@ -33,7 +37,11 @@ public record VesselState(
     Integer ravagerAttackTicks,
     Integer ravagerStunnedTicks,
     Integer ravagerRoarTicks,
-    Spellcaster.Spell spellcasterSpell
+    Spellcaster.Spell spellcasterSpell,
+    EnderDragon.Phase dragonPhase,
+    Location dragonPodium,
+    Float shulkerPeek,
+    BlockFace shulkerAttachedFace
 ) {
     public static VesselState capture(Mob mob) {
         Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
@@ -49,6 +57,10 @@ public record VesselState(
         Integer ravagerStunnedTicks = mob instanceof Ravager ravager ? ravager.getStunnedTicks() : null;
         Integer ravagerRoarTicks = mob instanceof Ravager ravager ? ravager.getRoarTicks() : null;
         Spellcaster.Spell spellcasterSpell = mob instanceof Spellcaster spellcaster ? spellcaster.getSpell() : null;
+        EnderDragon.Phase dragonPhase = mob instanceof EnderDragon dragon ? dragon.getPhase() : null;
+        Location dragonPodium = mob instanceof EnderDragon dragon ? dragon.getPodium().clone() : null;
+        Float shulkerPeek = mob instanceof Shulker shulker ? shulker.getPeek() : null;
+        BlockFace shulkerAttachedFace = mob instanceof Shulker shulker ? shulker.getAttachedFace() : null;
 
         return new VesselState(
             mob.isAware(),
@@ -70,12 +82,16 @@ public record VesselState(
             ravagerAttackTicks,
             ravagerStunnedTicks,
             ravagerRoarTicks,
-            spellcasterSpell
+            spellcasterSpell,
+            dragonPhase,
+            dragonPodium,
+            shulkerPeek,
+            shulkerAttachedFace
         );
     }
 
     public void applyPossessionState(Mob mob) {
-        mob.getPathfinder().stopPathfinding();
+        stopPathfinding(mob);
         mob.setTarget(null);
         mob.setJumping(false);
         mob.setAggressive(false);
@@ -108,10 +124,34 @@ public record VesselState(
         if (mob instanceof Spellcaster spellcaster) {
             spellcaster.setSpell(Spellcaster.Spell.NONE);
         }
+        if (mob instanceof EnderDragon dragon) {
+            dragon.setPhase(EnderDragon.Phase.HOVER);
+            dragon.setVelocity(new org.bukkit.util.Vector());
+            dragon.setGravity(false);
+        }
+        if (mob instanceof Shulker shulker) {
+            shulker.setVelocity(new org.bukkit.util.Vector());
+            shulker.setGravity(false);
+        }
     }
 
     public void restore(Mob mob) {
-        mob.getPathfinder().stopPathfinding();
+        restoreCommon(mob);
+        restoreSpecial(mob);
+    }
+
+    public void restoreRetainedCreated(Mob mob) {
+        restoreCommon(mob);
+        restoreSpecial(mob);
+        if (mob instanceof EnderDragon dragon) {
+            dragon.setVelocity(new org.bukkit.util.Vector());
+            dragon.setPhase(EnderDragon.Phase.HOVER);
+            dragon.setPodium(dragon.getLocation());
+        }
+    }
+
+    private void restoreCommon(Mob mob) {
+        stopPathfinding(mob);
         mob.setTarget(null);
         mob.setJumping(false);
         mob.setAI(ai);
@@ -120,7 +160,9 @@ public record VesselState(
         mob.setRemoveWhenFarAway(removeWhenFarAway);
         mob.setAggressive(aggressive);
         mob.setGravity(gravity);
+    }
 
+    private void restoreSpecial(Mob mob) {
         boolean targetRestored = false;
         if (target != null && Bukkit.isOwnedByCurrentRegion(target) && target.isValid() && !target.isDead()) {
             mob.setTarget(target);
@@ -160,6 +202,29 @@ public record VesselState(
                 guardian.setLaserTicks(safeTicks);
             }
         }
+        if (mob instanceof EnderDragon dragon) {
+            if (dragonPodium != null && dragonPodium.getWorld() == dragon.getWorld()) {
+                dragon.setPodium(dragonPodium.clone());
+            }
+            if (dragonPhase != null && dragonPhase != EnderDragon.Phase.DYING) {
+                dragon.setPhase(dragonPhase);
+            }
+        }
+        if (mob instanceof Shulker shulker) {
+            if (shulkerAttachedFace != null) {
+                shulker.setAttachedFace(shulkerAttachedFace);
+            }
+            if (shulkerPeek != null) {
+                shulker.setPeek(Math.max(0.0f, Math.min(1.0f, shulkerPeek)));
+            }
+        }
+    }
+
+    private static void stopPathfinding(Mob mob) {
+        if (mob instanceof EnderDragon) {
+            return;
+        }
+        mob.getPathfinder().stopPathfinding();
     }
 
     static void restoreCreeper(Creeper creeper, boolean ignited, int fuseTicks) {

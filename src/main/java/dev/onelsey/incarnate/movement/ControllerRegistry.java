@@ -65,6 +65,8 @@ public final class ControllerRegistry {
     private final VesselController frog;
     private final VesselController climbing;
     private final VesselController cube;
+    private final VesselController dragon;
+    private final VesselController shulker;
 
     public ControllerRegistry(FileConfiguration config) {
         this.ground = new GroundVesselController(config);
@@ -75,10 +77,18 @@ public final class ControllerRegistry {
         this.frog = new HoppingAquaticVesselController(config);
         this.climbing = new ClimbingVesselController(config);
         this.cube = new CubeVesselController(config);
+        this.dragon = new DragonVesselController(config);
+        this.shulker = new ShulkerVesselController(config);
     }
 
     public VesselController controllerFor(Mob mob) {
         EntityType type = mob.getType();
+        if (type == EntityType.ENDER_DRAGON) {
+            return dragon;
+        }
+        if (type == EntityType.SHULKER) {
+            return shulker;
+        }
         if (FLIGHT.contains(type)) {
             return flight;
         }

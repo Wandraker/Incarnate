@@ -16,7 +16,7 @@ class ConfigMigratorTest {
         user.set("control.release-at-vessel", false);
 
         YamlConfiguration defaults = new YamlConfiguration();
-        defaults.set("config-version", 1);
+        defaults.set("config-version", 2);
         defaults.set("movement.ground.maximum-walk-speed", 0.55);
         defaults.set("abilities.skeleton.cooldown-ticks", 12);
         defaults.set("control.release-at-vessel", true);
@@ -29,20 +29,42 @@ class ConfigMigratorTest {
         assertFalse(user.getBoolean("control.release-at-vessel"));
         assertEquals("MOUNTED", user.getString("camera.mode"));
         assertEquals(8, user.getInt("camera.mount-retries"));
-        assertEquals(1, user.getInt("config-version"));
+        assertEquals(2, user.getInt("config-version"));
     }
 
     @Test
     void mergeIsNoOpOnceAllKeysExist() {
         YamlConfiguration user = new YamlConfiguration();
-        user.set("config-version", 1);
+        user.set("config-version", 2);
         user.set("camera.mode", "SPECTATOR_TARGET");
 
         YamlConfiguration defaults = new YamlConfiguration();
-        defaults.set("config-version", 1);
+        defaults.set("config-version", 2);
         defaults.set("camera.mode", "MOUNTED");
 
         assertFalse(ConfigMigrator.mergeMissing(user, defaults));
         assertEquals("SPECTATOR_TARGET", user.getString("camera.mode"));
+    }
+
+    @Test
+    void schemaMigrationAdvancesVersionAndUnlocksLegacyDefaultExclusions() {
+        YamlConfiguration user = new YamlConfiguration();
+        user.set("config-version", 1);
+        user.set("excluded-types", java.util.List.of("ENDER_DRAGON", "SHULKER"));
+
+        assertTrue(ConfigMigrator.migrateSchema(user, 1));
+        assertEquals(2, user.getInt("config-version"));
+        assertTrue(user.getStringList("excluded-types").isEmpty());
+    }
+
+    @Test
+    void schemaMigrationPreservesCustomizedExclusions() {
+        YamlConfiguration user = new YamlConfiguration();
+        user.set("config-version", 1);
+        user.set("excluded-types", java.util.List.of("ENDER_DRAGON", "SHULKER", "WARDEN"));
+
+        assertTrue(ConfigMigrator.migrateSchema(user, 1));
+        assertEquals(2, user.getInt("config-version"));
+        assertEquals(java.util.List.of("ENDER_DRAGON", "SHULKER", "WARDEN"), user.getStringList("excluded-types"));
     }
 }

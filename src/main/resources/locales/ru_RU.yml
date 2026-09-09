@@ -61,6 +61,8 @@ messages:
     region-join-failed: 'Не удалось безопасно объединить игрока и тело в одном регионе сущностей.'
 
   ability:
+    dragon-fireball: 'дыхание дракона'
+    shulker-bullet: 'снаряд шалкера'
     guardian-laser: 'лазер хранителя'
     fuse: 'взрыватель'
     arrow-melee: 'стрела / ближний бой'

@@ -64,9 +64,6 @@ public final class IncarnatePlugin extends JavaPlugin {
 
     private Set<EntityType> loadExcludedTypes() {
         Set<EntityType> excluded = EnumSet.noneOf(EntityType.class);
-        excluded.add(EntityType.ENDER_DRAGON);
-        excluded.add(EntityType.SHULKER);
-
         for (String raw : getConfig().getStringList("excluded-types")) {
             try {
                 excluded.add(EntityType.valueOf(raw.toUpperCase(Locale.ROOT)));
