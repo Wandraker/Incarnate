@@ -1,7 +1,6 @@
 package dev.onelsey.incarnate.config;
 
 import dev.onelsey.incarnate.IncarnatePlugin;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
@@ -13,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 public final class ConfigMigrator {
+    private static final int CURRENT_SCHEMA = 1;
+
     private ConfigMigrator() {
     }
 
@@ -25,6 +26,13 @@ public final class ConfigMigrator {
         }
 
         YamlConfiguration user = YamlConfiguration.loadConfiguration(configFile);
+        int schema = user.getInt("config-version", 0);
+        if (schema > CURRENT_SCHEMA) {
+            throw new IllegalStateException(
+                "config.yml was created by a newer Incarnate version (schema " + schema + ")"
+            );
+        }
+
         YamlConfiguration defaults = loadResource(plugin, "config.yml");
         boolean changed = mergeMissing(user, defaults);
 
