@@ -4,6 +4,7 @@ import dev.onelsey.incarnate.IncarnatePlugin;
 import dev.onelsey.incarnate.ability.AbilityRegistry;
 import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.ViewSnapshot;
+import dev.onelsey.incarnate.integration.ElysiumPrivateTagIntegration;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
 import dev.onelsey.incarnate.movement.VesselController;
 import dev.onelsey.incarnate.permission.IncarnatePermissions;
@@ -30,6 +31,7 @@ public final class PossessionManager {
     private final ControllerRegistry controllers;
     private final AbilityRegistry abilities;
     private final PossessionVisibilityManager visibility;
+    private final ElysiumPrivateTagIntegration privateTags;
     private final Map<UUID, PossessionSession> byPlayer = new ConcurrentHashMap<>();
     private final Map<UUID, PossessionSession> byVessel = new ConcurrentHashMap<>();
     private final Set<UUID> pendingPlayers = ConcurrentHashMap.newKeySet();
@@ -48,12 +50,14 @@ public final class PossessionManager {
         ControllerRegistry controllers,
         AbilityRegistry abilities,
         PossessionVisibilityManager visibility,
+        ElysiumPrivateTagIntegration privateTags,
         Set<EntityType> excluded
     ) {
         this.plugin = plugin;
         this.controllers = controllers;
         this.abilities = abilities;
         this.visibility = visibility;
+        this.privateTags = privateTags;
         this.excluded = Set.copyOf(excluded);
         this.removeCreatedOnRelease = plugin.getConfig().getBoolean("created-vessels.remove-on-release", true);
         this.removeOrphanedCreated = plugin.getConfig().getBoolean("created-vessels.remove-orphaned-after-recovery", true);
@@ -263,6 +267,7 @@ public final class PossessionManager {
             }
 
             playerRecovery.save(player, session.playerState());
+            privateTags.suppress(player);
             startInputSampler(session);
             player.setGameMode(GameMode.SPECTATOR);
             try {
@@ -472,6 +477,7 @@ public final class PossessionManager {
                         playerRecovery.clear(player);
                         restoringPlayers.remove(session.playerId());
                         visibility.reveal(session.playerId(), player);
+                        privateTags.restore(player);
                         if (reason != ReleaseReason.QUIT && reason != ReleaseReason.PLUGIN_DISABLE) {
                             player.sendMessage(Component.text("[Incarnate] Released from vessel."));
                         }
@@ -579,6 +585,7 @@ public final class PossessionManager {
             if (visibility.isConcealed(playerId)) {
                 visibility.reveal(playerId, player);
             }
+            privateTags.restore(player);
             return;
         }
 
@@ -592,6 +599,7 @@ public final class PossessionManager {
             if (error == null && Boolean.TRUE.equals(success)) {
                 restoringPlayers.remove(playerId);
                 visibility.reveal(playerId, player);
+                privateTags.restore(player);
                 notifyPlayer(player, "[Incarnate] Recovered from an interrupted possession session.");
             } else {
                 plugin.getLogger().warning("Interrupted possession recovery is still pending for " + playerId + ".");
@@ -655,6 +663,7 @@ public final class PossessionManager {
                     }
                 }
                 restorePlayerState(player, session.playerState());
+                privateTags.restore(player);
             }
 
             Mob vessel = session.vessel();
