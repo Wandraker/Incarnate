@@ -18,13 +18,19 @@ Author: Onelsey
 
 The build is pinned to Paper API `26.2.build.121-stable`.
 
-## Commands
+## Commands and controls
 
 - `/incarnate <mob>` - create a real Mob body and enter it.
 - `/possess` - possess the real Mob currently aimed at within the configured distance.
 - `/release` - leave the current body.
 - `/incarnate primary` - fallback primary-ability trigger for testing.
-- `Shift + F` - normal quick release with default keybinds. Technically this is Sneak + Swap Offhand, so a player who rebinds Swap Offhand uses their rebound key.
+- `/incarnate secondary` - fallback secondary-ability trigger for testing.
+- `/incarnate inspect` - admin-only inspection of the controlled body currently aimed at. It reports the controller, vessel UUID and whether the body was created or possessed without exposing that information visually above the Mob.
+- Left click - primary attack / ability.
+- `F` - secondary ability with default keybinds. Technically this is Swap Offhand, so rebinding Swap Offhand also rebinds this control.
+- `Shift + F` - quick release. Technically this is Sneak + Swap Offhand.
+
+`/incarnate inspect` requires `incarnate.admin.inspect`. Creating a body requires `incarnate.use.incarnate`.
 
 ## What 0.1.0 implements
 
@@ -36,11 +42,15 @@ Ender Dragon and Shulker are deliberately excluded in 0.1.0.
 
 ### Controller privacy
 
-The hidden Player is not copied into the Mob name. Incarnate hides the controller from other players and, by default, temporarily unlists it from their tab list. A Paper tracking event is also blocked for concealed controllers so a re-track does not make the hidden Player appear again.
+The hidden Player is not copied into the Mob name. Incarnate blocks Paper entity tracking for concealed controllers and, by default, temporarily removes them from each viewer's tab list.
+
+World concealment uses a short hide/show tracking pulse rather than keeping a long-lived plugin-scoped `hidePlayer` layer. The pulse forces the old Player tracker pairing to be removed, then the `PlayerTrackEntityEvent` guard prevents the controller from being spawned again while possession is active. This avoids leaving a persistent Incarnate hide layer behind after normal release or plugin reload.
 
 ### Folia-safe ownership model
 
 Player input is sampled on the Player EntityScheduler. Vessel mutation runs on the Mob EntityScheduler. Cross-region control uses snapshots rather than reading live Player state from the vessel thread.
+
+Interrupted vessel recovery uses a durable UUID index so already-loaded Mob bodies can also be recovered after plugin/server restart instead of depending only on a future entity-load event.
 
 ### Movement families
 
@@ -50,8 +60,11 @@ Player input is sampled on the Player EntityScheduler. Vessel mutation runs on t
 - flying mobs;
 - aquatic mobs;
 - amphibious mobs;
+- Rabbit and Frog hopping behavior;
 - spiders/cave spiders with wall climbing;
 - Slime, Magma Cube and Sulfur Cube with hopping movement.
+
+Ordinary ground bodies use their real `MOVEMENT_SPEED` and `JUMP_STRENGTH` attributes where available. Flying bodies use their real `FLYING_SPEED` attribute where available, with configurable safety clamps and a fallback speed for entities without that attribute.
 
 Unknown/future Mob types fall back to ground movement rather than packet disguise logic.
 
@@ -72,17 +85,30 @@ Implemented in 0.1.0:
 
 Other mobs fall back to a real melee attack when a living target is under the vessel crosshair. Damage, held equipment and knockback are evaluated by the Mob/Paper attack path, not by the hidden Player.
 
-More mob-specific abilities are planned after runtime testing proves the camera/input foundation.
+### Secondary abilities
+
+Secondary abilities use a separate cooldown channel from primary attacks.
+
+Implemented in 0.1.0:
+
+- Enderman: directional teleport with collision ray tracing and a safe landing search;
+- Spider / Cave Spider: forward pounce from the real body while grounded.
+
+More secondary abilities can be added per Mob without changing the possession core.
 
 ## Recovery
 
-Before taking over an existing Mob, Incarnate stores its original AI/awareness/persistence/despawn/aggressive state in PDC. Interrupted sessions can restore marked vessels when they load again. Created orphan vessels are removed by default.
+Before taking over an existing Mob, Incarnate stores its original AI/awareness/persistence/despawn/aggressive/gravity and special-state data in PDC. Interrupted sessions can restore marked vessels when they load again. Created orphan vessels are removed by default.
 
-The Player's original game mode, flight permission, flight state and fly speed are also stored for interrupted-session recovery.
+On a normal release, Incarnate also restores the Mob's pre-possession combat target when that target is still alive and safely owned by the same Folia region. It deliberately does not perform a cross-region target restore.
+
+The Player's original game mode, flight permission, flight state, fly speed, world, location and rotation are stored for interrupted-session recovery. Recovery remains pending instead of deleting its marker if the saved world is temporarily unavailable.
 
 ## Validation
 
-GitHub Actions compiles Incarnate with Java 25 against Paper API `26.2.build.121-stable` and runs a startup smoke test on an actual Paper 26.2 build 121 server. Live gameplay testing on Paper/Purpur/Leaf/Folia remains the final validation gate for camera/input behavior and mob-specific mechanics.
+GitHub Actions compiles Incarnate with Java 25 against Paper API `26.2.build.121-stable` and runs an actual Paper 26.2 build 121 startup/shutdown smoke test. The smoke test waits for full server startup, sends the normal `stop` command and verifies that Incarnate both enables and disables without plugin exceptions.
+
+Live gameplay testing on Paper/Purpur/Leaf/Folia remains the final validation gate for camera/input feel and individual Mob mechanics.
 
 ## Build
 
