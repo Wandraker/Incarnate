@@ -4,7 +4,9 @@ import dev.onelsey.incarnate.ability.AbilityRegistry;
 import dev.onelsey.incarnate.command.IncarnateCommand;
 import dev.onelsey.incarnate.command.PossessCommand;
 import dev.onelsey.incarnate.command.ReleaseCommand;
+import dev.onelsey.incarnate.config.ConfigMigrator;
 import dev.onelsey.incarnate.listener.SessionListener;
+import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.visibility.PossessionVisibilityManager;
@@ -18,28 +20,33 @@ import java.util.Set;
 
 public final class IncarnatePlugin extends JavaPlugin {
     private PossessionManager possessions;
+    private MessageService messages;
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
+        ConfigMigrator.prepare(this);
+        messages = new MessageService(this);
+        messages.initialize();
 
         Set<EntityType> excluded = loadExcludedTypes();
         ControllerRegistry controllers = new ControllerRegistry(getConfig());
         AbilityRegistry abilities = new AbilityRegistry(getConfig());
         PossessionVisibilityManager visibility = new PossessionVisibilityManager(this);
-        possessions = new PossessionManager(this, controllers, abilities, visibility, excluded);
+        possessions = new PossessionManager(this, controllers, abilities, visibility, messages, excluded);
 
         IncarnateCommand incarnateCommand = new IncarnateCommand(
             possessions,
+            messages,
             getConfig().getDouble("admin.inspect-distance", 12.0)
         );
         Objects.requireNonNull(getCommand("incarnate")).setExecutor(incarnateCommand);
         Objects.requireNonNull(getCommand("incarnate")).setTabCompleter(incarnateCommand);
         Objects.requireNonNull(getCommand("possess")).setExecutor(new PossessCommand(
             possessions,
+            messages,
             getConfig().getDouble("control.max-possession-distance", 8.0)
         ));
-        Objects.requireNonNull(getCommand("release")).setExecutor(new ReleaseCommand(possessions));
+        Objects.requireNonNull(getCommand("release")).setExecutor(new ReleaseCommand(possessions, messages));
 
         getServer().getPluginManager().registerEvents(new SessionListener(this, possessions), this);
         possessions.recoverIndexedVessels();
