@@ -37,7 +37,6 @@ public final class VesselRecoveryStore {
         this.gravityKey = new NamespacedKey(plugin, "vessel_recovery_gravity");
         this.batAwakeKey = new NamespacedKey(plugin, "vessel_recovery_bat_awake");
         this.creeperIgnitedKey = new NamespacedKey(plugin, "vessel_recovery_creeper_ignited");
-        this.creperFuseTicksKey = null;
         this.creeperFuseTicksKey = new NamespacedKey(plugin, "vessel_recovery_creeper_fuse_ticks");
     }
 
