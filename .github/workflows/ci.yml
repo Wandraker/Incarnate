@@ -31,3 +31,56 @@ jobs:
 
       - name: Compile against Paper 26.2
         run: gradle clean classes --stacktrace --warning-mode all
+
+  paper-smoke:
+    needs: compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.1'
+
+      - name: Build temporary plugin jar
+        run: gradle clean jar --stacktrace --warning-mode all
+
+      - name: Download Paper 26.2 build 121
+        shell: bash
+        run: |
+          set -euo pipefail
+          USER_AGENT='Incarnate-CI/0.1.0 (GitHub Actions)'
+          BUILDS=$(curl -fsSL -H "User-Agent: ${USER_AGENT}" 'https://fill.papermc.io/v3/projects/paper/versions/26.2/builds')
+          PAPER_URL=$(printf '%s' "$BUILDS" | jq -r 'first(.[] | select(.id == 121) | .downloads."server:default".url) // empty')
+          test -n "$PAPER_URL"
+          curl -fsSL -H "User-Agent: ${USER_AGENT}" -o paper.jar "$PAPER_URL"
+
+      - name: Start Paper and verify Incarnate startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-server/plugins
+          cp build/libs/Incarnate-0.1.0.jar ci-server/plugins/Incarnate.jar
+          cp paper.jar ci-server/paper.jar
+          printf 'eula=true\n' > ci-server/eula.txt
+          set +e
+          (cd ci-server && timeout 90s java -Xms768M -Xmx1536M -jar paper.jar --nogui) > paper-smoke.log 2>&1
+          EXIT_CODE=$?
+          set -e
+          cat paper-smoke.log
+          if [ "$EXIT_CODE" -ne 0 ] && [ "$EXIT_CODE" -ne 124 ]; then
+            exit "$EXIT_CODE"
+          fi
+          grep -F 'Incarnate 0.1.0 enabled for Minecraft 26.2+' paper-smoke.log
+          if grep -E 'Error occurred while enabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate' paper-smoke.log; then
+            exit 1
+          fi
