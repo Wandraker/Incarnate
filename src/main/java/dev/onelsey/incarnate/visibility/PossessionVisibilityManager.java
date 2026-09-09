@@ -75,11 +75,12 @@ public final class PossessionVisibilityManager {
             return;
         }
 
-        if (hideFromTab && viewer.canSee(controller) && viewer.isListed(controller) && viewer.unlistPlayer(controller)) {
+        if (hideFromTab && viewer.isListed(controller) && viewer.unlistPlayer(controller)) {
             tabUnlistedByIncarnate.computeIfAbsent(controllerId, ignored -> ConcurrentHashMap.newKeySet())
                 .add(viewer.getUniqueId());
         }
-        viewer.hidePlayer(plugin, controller);
+
+        pulseTracking(viewer, controller);
     }
 
     private void showTo(Player viewer, UUID controllerId) {
@@ -92,7 +93,8 @@ public final class PossessionVisibilityManager {
                 return;
             }
 
-            viewer.showPlayer(plugin, controller);
+            pulseTracking(viewer, controller);
+
             Set<UUID> viewers = tabUnlistedByIncarnate.get(controllerId);
             if (hideFromTab && viewers != null && viewers.remove(viewer.getUniqueId()) && viewer.canSee(controller)) {
                 viewer.listPlayer(controller);
@@ -101,5 +103,10 @@ public final class PossessionVisibilityManager {
                 tabUnlistedByIncarnate.remove(controllerId, viewers);
             }
         }, null);
+    }
+
+    private void pulseTracking(Player viewer, Player controller) {
+        viewer.hidePlayer(plugin, controller);
+        viewer.showPlayer(plugin, controller);
     }
 }
