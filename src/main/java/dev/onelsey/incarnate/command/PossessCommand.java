@@ -1,5 +1,6 @@
 package dev.onelsey.incarnate.command;
 
+import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.permission.IncarnatePermissions;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionOrigin;
@@ -14,28 +15,33 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.util.RayTraceResult;
 
+import java.util.Locale;
+import java.util.Map;
+
 public final class PossessCommand implements CommandExecutor {
     private final PossessionManager possessions;
+    private final MessageService messages;
     private final double distance;
 
-    public PossessCommand(PossessionManager possessions, double distance) {
+    public PossessCommand(PossessionManager possessions, MessageService messages, double distance) {
         this.possessions = possessions;
+        this.messages = messages;
         this.distance = Math.max(0.5, distance);
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("This command is player-only.");
+            messages.send(sender, "player-only");
             return true;
         }
 
         if (!player.hasPermission(IncarnatePermissions.POSSESS)) {
-            player.sendMessage(Component.text("[Incarnate] You do not have permission to possess existing mobs."));
+            messages.send(player, "permission-possess");
             return true;
         }
         if (possessions.isPossessing(player)) {
-            player.sendMessage(Component.text("[Incarnate] You are already possessing a vessel."));
+            messages.send(player, "already-possessing");
             return true;
         }
 
@@ -53,11 +59,15 @@ public final class PossessCommand implements CommandExecutor {
 
         Entity entity = hit == null ? null : hit.getHitEntity();
         if (!(entity instanceof Mob mob)) {
-            player.sendMessage(Component.text("[Incarnate] Look at a mob within " + distance + " blocks."));
+            messages.send(player, "possess-look", Map.of(
+                "distance", Component.text(String.format(Locale.ROOT, "%.1f", distance))
+            ));
             return true;
         }
         if (!IncarnatePermissions.canUseMob(player, mob.getType())) {
-            player.sendMessage(Component.text("[Incarnate] You do not have access to the " + mob.getType() + " vessel."));
+            messages.send(player, "mob-access-denied", Map.of(
+                "entity", Component.text(mob.getType().name().toLowerCase(Locale.ROOT))
+            ));
             return true;
         }
 
