@@ -9,6 +9,7 @@ import dev.onelsey.incarnate.movement.VesselController;
 import dev.onelsey.incarnate.visibility.PossessionVisibilityManager;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
@@ -403,7 +404,6 @@ public final class PossessionManager {
             }
 
             restorePlayerState(player, session.playerState());
-            visibility.reveal(session.playerId(), player);
 
             Location destination = releaseAtVessel && vesselLocation != null ? vesselLocation : session.playerState().location();
             player.teleportAsync(destination).whenComplete((success, error) -> {
@@ -414,18 +414,19 @@ public final class PossessionManager {
                     if (error == null && Boolean.TRUE.equals(success)) {
                         playerRecovery.clear(player);
                         restoringPlayers.remove(session.playerId());
+                        visibility.reveal(session.playerId(), player);
+                        if (reason != ReleaseReason.QUIT && reason != ReleaseReason.PLUGIN_DISABLE) {
+                            player.sendMessage(Component.text("[Incarnate] Released from vessel."));
+                        }
                     } else {
                         plugin.getLogger().warning("Release teleport failed for " + player.getUniqueId() + "; recovery marker was kept.");
                         player.sendMessage(Component.text("[Incarnate] Release teleport failed; recovery state was kept for safety."));
                     }
                 }, null);
                 if (clearTask == null) {
+                    // Keep recovery PDC and concealment. Recovery will finish on a safe player thread later.
                 }
             });
-
-            if (reason != ReleaseReason.QUIT && reason != ReleaseReason.PLUGIN_DISABLE) {
-                player.sendMessage(Component.text("[Incarnate] Released from vessel."));
-            }
         }, null);
         if (restoreTask == null) {
             visibility.forget(session.playerId());
@@ -436,9 +437,7 @@ public final class PossessionManager {
         player.setGameMode(state.gameMode());
         player.setAllowFlight(state.allowFlight());
         player.setFlySpeed(state.flySpeed());
-        if (state.allowFlight()) {
-            player.setFlying(state.flying());
-        }
+        player.setFlying(state.allowFlight() && state.flying());
     }
 
     public void releaseOnQuit(Player player) {
@@ -505,10 +504,7 @@ public final class PossessionManager {
         if (!restoringPlayers.contains(player.getUniqueId()) && !playerRecovery.hasRecovery(player)) {
             return;
         }
-        player.getScheduler().runDelayed(plugin, task -> {
-            recoverPlayerIfNeeded(player);
-            visibility.reveal(player.getUniqueId(), player);
-        }, null, 1L);
+        player.getScheduler().runDelayed(plugin, task -> recoverPlayerIfNeeded(player), null, 1L);
     }
 
     public void onPlayerJoin(Player player) {
@@ -516,10 +512,7 @@ public final class PossessionManager {
         if (playerRecovery.hasRecovery(player)) {
             restoringPlayers.add(player.getUniqueId());
         }
-        player.getScheduler().run(plugin, task -> {
-            recoverPlayerIfNeeded(player);
-            visibility.reveal(player.getUniqueId(), player);
-        }, null);
+        player.getScheduler().run(plugin, task -> recoverPlayerIfNeeded(player), null);
     }
 
     public void recoverPlayerIfNeeded(Player player) {
@@ -539,6 +532,7 @@ public final class PossessionManager {
             recoveryInFlight.remove(playerId);
             if (error == null && Boolean.TRUE.equals(success)) {
                 restoringPlayers.remove(playerId);
+                visibility.reveal(playerId, player);
                 notifyPlayer(player, "[Incarnate] Recovered from an interrupted possession session.");
             } else {
                 plugin.getLogger().warning("Interrupted possession recovery is still pending for " + playerId + ".");
@@ -568,10 +562,48 @@ public final class PossessionManager {
 
     public void shutdown() {
         for (PossessionSession session : List.copyOf(byPlayer.values())) {
-            requestRelease(session, ReleaseReason.PLUGIN_DISABLE);
+            if (!session.deactivate()) {
+                continue;
+            }
+
+            byPlayer.remove(session.playerId(), session);
+            byVessel.remove(session.vesselId(), session);
+            cancelTasks(session);
+
+            Player player = session.player();
+            if (player.isOnline() && Bukkit.isOwnedByCurrentRegion(player)) {
+                if (player.getGameMode() == GameMode.SPECTATOR) {
+                    try {
+                        player.setSpectatorTarget(null);
+                    } catch (IllegalStateException ignored) {
+                    }
+                }
+                restorePlayerState(player, session.playerState());
+            }
+
+            Mob vessel = session.vessel();
+            if (vessel.isValid() && Bukkit.isOwnedByCurrentRegion(vessel)) {
+                if (session.origin() == PossessionOrigin.CREATED && removeCreatedOnRelease) {
+                    vesselRecovery.clear(vessel);
+                    vessel.remove();
+                } else {
+                    if (!vessel.isDead()) {
+                        session.vesselState().restore(vessel);
+                    }
+                    vesselRecovery.clear(vessel);
+                }
+            }
+
+            // JavaPlugin is already disabled before onDisable runs, so scheduling here is illegal on Folia.
+            // Recovery PDC remains authoritative for state that the current region does not safely own.
+            visibility.forget(session.playerId());
         }
+
+        byPlayer.clear();
+        byVessel.clear();
         pendingPlayers.clear();
         pendingVessels.clear();
+        recoveryInFlight.clear();
     }
 
     private void deferFromRetired(Runnable action) {
