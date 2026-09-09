@@ -4,7 +4,7 @@
 
 Native Abilities Update.
 
-- Added real Guardian / Elder Guardian laser attacks using the Paper Guardian API. The laser charges over native laser ticks and lets the Guardian API apply the actual hit rather than calling manual damage.
+- Added real Guardian / Elder Guardian laser attacks. Incarnate temporarily enables awareness only for the bounded laser window so the vanilla GuardianAttackGoal performs its own charge and native magic + attack damage; possession returns the body to unaware immediately afterward.
 - Guardian laser targets are validated on the vessel-owned Folia region and the attack cancels safely if the target dies, crosses regions, or leaves line of sight.
 - Added PufferFish secondary puff toggle using the real puff state, with normal and crash recovery of the original puff state.
 - Added Vex secondary charge using the real charging state plus a 3D physical impulse and movement-control lock; original charging state is recovered.

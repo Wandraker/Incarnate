@@ -114,7 +114,7 @@ Implemented in 0.2.0:
 - Snow Golem: Snowball;
 - Llama / Trader Llama: Llama Spit;
 - Breeze: Breeze Wind Charge;
-- Guardian / Elder Guardian: a real charging Guardian laser, advanced tick-by-tick through the Guardian API until native damage is applied;
+- Guardian / Elder Guardian: a real charging Guardian laser; Incarnate temporarily allows the vanilla Guardian attack goal to tick under a locked target/movement window so vanilla Guardian damage is applied;
 - Creeper: primary toggles the real creeper fuse;
 - Pillager / Piglin: native Paper ranged attack when holding a crossbow;
 - Drowned: native ranged attack when holding a trident;
@@ -149,7 +149,7 @@ The Player's original game mode, flight permission, flight state, fly speed, wor
 
 ### AI suppression note
 
-0.1.0 keeps the real Mob AI flag enabled but temporarily sets the body to unaware while it is player-controlled. This is currently the safest public-API way to suppress autonomous pathfinding without making the entity immobile. Paper notes that unaware mobs can also have some unspecified autonomous/environmental behavior disabled, so live gameplay testing remains required before the first public release. Incarnate restores the original awareness state on release and interrupted-session recovery.
+0.2.0 keeps the real Mob AI flag enabled but normally sets the body to unaware while it is player-controlled. This is currently the safest public-API way to suppress autonomous pathfinding without making the entity immobile. Paper notes that unaware mobs can also have some unspecified autonomous/environmental behavior disabled, so live gameplay testing remains required before the first public release. A narrowly scoped exception exists for abilities that require their vanilla goal to tick: Guardian laser temporarily enables awareness only for its bounded attack window while movement and target are controlled, then returns the body to unaware. Incarnate restores the original awareness state on release and interrupted-session recovery.
 
 ## Validation
 

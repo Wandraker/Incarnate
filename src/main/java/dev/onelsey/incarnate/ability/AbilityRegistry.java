@@ -204,7 +204,8 @@ public final class AbilityRegistry {
         if (vessel instanceof Guardian guardian && session.guardianLaserActive()) {
             guardian.setLaser(false);
             guardian.setTarget(null);
-            session.guardianLaserActive(false);
+            guardian.setAware(false);
+            session.clearGuardianLaser();
         }
         if (vessel instanceof Vex vex && session.vexChargeActive()) {
             vex.setCharging(false);
@@ -238,20 +239,27 @@ public final class AbilityRegistry {
         if (target == null || !guardian.hasLineOfSight(target)) {
             return false;
         }
-        int cooldown = Math.max(guardianLaserCooldownTicks, guardian.getLaserDuration() + 10);
+        if (!guardian.getWorld().equals(target.getWorld())) {
+            return false;
+        }
+        double distanceSquared = guardian.getLocation().distanceSquared(target.getLocation());
+        if (distanceSquared <= 9.0) {
+            return melee(session, guardian);
+        }
+
+        int timeoutTicks = Math.max(20, guardian.getLaserDuration() + 40);
+        int cooldown = Math.max(guardianLaserCooldownTicks, timeoutTicks);
         if (!session.acquirePrimaryCooldown(cooldown)) {
             return false;
         }
 
+        guardian.setLaser(false);
         guardian.setTarget(target);
-        if (!guardian.setLaser(true)) {
-            guardian.setTarget(null);
-            return false;
-        }
-        guardian.setLaserTicks(-10);
+        guardian.setAware(true);
+        guardian.getPathfinder().stopPathfinding();
         guardian.setVelocity(new Vector());
-        session.guardianLaserActive(true);
-        session.lockMovementControl(guardian.getLaserDuration() + 12);
+        session.startGuardianLaser(timeoutTicks);
+        session.lockMovementControl(timeoutTicks);
         return true;
     }
 
@@ -259,9 +267,16 @@ public final class AbilityRegistry {
         if (!session.guardianLaserActive()) {
             return;
         }
+
         LivingEntity target = guardian.getTarget();
-        if (!guardian.hasLaser()
-            || target == null
+        if (target == null) {
+            guardian.setLaser(false);
+            guardian.setAware(false);
+            session.clearGuardianLaser();
+            return;
+        }
+
+        if (session.guardianLaserExpired()
             || !Bukkit.isOwnedByCurrentRegion(target)
             || !target.isValid()
             || target.isDead()
@@ -270,20 +285,13 @@ public final class AbilityRegistry {
             || !guardian.hasLineOfSight(target)) {
             guardian.setLaser(false);
             guardian.setTarget(null);
-            session.guardianLaserActive(false);
+            guardian.setAware(false);
+            session.clearGuardianLaser();
             return;
         }
 
-        int duration = Math.max(1, guardian.getLaserDuration());
-        int nextTicks = Math.max(-10, guardian.getLaserTicks()) + 1;
-        if (nextTicks >= duration) {
-            guardian.setLaserTicks(duration);
-            guardian.setLaser(false);
-            guardian.setTarget(null);
-            session.guardianLaserActive(false);
-            return;
-        }
-        guardian.setLaserTicks(nextTicks);
+        guardian.setAware(true);
+        guardian.getPathfinder().stopPathfinding();
     }
 
     private boolean togglePufferFish(PossessionSession session, PufferFish pufferFish) {
