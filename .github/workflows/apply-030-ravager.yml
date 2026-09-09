@@ -1,0 +1,33 @@
+name: Apply 0.3.0 Ravager ability
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+
+      - name: Apply Ravager patch
+        run: python3 tools/apply_030_ravager.py
+
+      - name: Commit Ravager ability
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'Onelsey'
+          git config user.email '103017546+Wandraker@users.noreply.github.com'
+          git add src/main/java/dev/onelsey/incarnate/ability/AbilityRegistry.java src/main/java/dev/onelsey/incarnate/possession/VesselState.java src/main/java/dev/onelsey/incarnate/possession/VesselRecoveryStore.java
+          git commit -m 'Add native Ravager roar for 0.3.0 [skip ci]'
+          git push
