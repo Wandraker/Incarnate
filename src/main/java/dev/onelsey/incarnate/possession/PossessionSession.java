@@ -27,6 +27,7 @@ public final class PossessionSession {
     private volatile ScheduledTask inputSamplerTask;
     private volatile long controlTick;
     private volatile long lastPrimaryAbilityTick = Long.MIN_VALUE;
+    private volatile long lastSecondaryAbilityTick = Long.MIN_VALUE;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
 
     public PossessionSession(
@@ -91,6 +92,16 @@ public final class PossessionSession {
             return false;
         }
         lastPrimaryAbilityTick = now;
+        return true;
+    }
+
+    public boolean acquireSecondaryCooldown(int cooldownTicks) {
+        long now = controlTick;
+        long last = lastSecondaryAbilityTick;
+        if (last != Long.MIN_VALUE && now - last < Math.max(1, cooldownTicks)) {
+            return false;
+        }
+        lastSecondaryAbilityTick = now;
         return true;
     }
 
