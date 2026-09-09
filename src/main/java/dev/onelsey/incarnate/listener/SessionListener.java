@@ -15,6 +15,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
@@ -63,9 +64,13 @@ public final class SessionListener implements Listener {
         if (session == null || !session.isActive()) {
             return;
         }
-        if (event.getCause() != PlayerTeleportEvent.TeleportCause.SPECTATE) {
-            event.setCancelled(true);
+        if (session.cameraTeleportInProgress()) {
+            return;
         }
+        if (session.usesSpectatorTargetCamera() && event.getCause() == PlayerTeleportEvent.TeleportCause.SPECTATE) {
+            return;
+        }
+        event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -80,9 +85,23 @@ public final class SessionListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onDismount(EntityDismountEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        PossessionSession session = possessions.session(player);
+        if (session == null || !session.isActive() || !session.usesMountedCamera()) {
+            return;
+        }
+        if (event.getDismounted().getUniqueId().equals(session.vesselId()) && event.isCancellable()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onStopSpectating(PlayerStopSpectatingEntityEvent event) {
         PossessionSession session = possessions.session(event.getPlayer());
-        if (session == null || !session.isActive()) {
+        if (session == null || !session.isActive() || !session.usesSpectatorTargetCamera()) {
             return;
         }
         if (event.getSpectatorTarget().getUniqueId().equals(session.vesselId())) {
@@ -95,6 +114,11 @@ public final class SessionListener implements Listener {
     public void onStartSpectating(PlayerStartSpectatingEntityEvent event) {
         PossessionSession session = possessions.session(event.getPlayer());
         if (session == null || !session.isActive()) {
+            return;
+        }
+        if (session.usesMountedCamera()) {
+            event.setCancelled(true);
+            possessions.triggerPrimary(event.getPlayer());
             return;
         }
         if (!event.getNewSpectatorTarget().getUniqueId().equals(session.vesselId())) {
