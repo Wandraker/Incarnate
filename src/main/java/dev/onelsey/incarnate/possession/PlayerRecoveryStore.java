@@ -44,7 +44,7 @@ public final class PlayerRecoveryStore {
 
     public void save(Player player, PlayerState state) {
         PersistentDataContainer data = player.getPersistentDataContainer();
-        data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
+        data.remove(activeKey);
         data.set(gameModeKey, PersistentDataType.STRING, state.gameMode().name());
         data.set(allowFlightKey, PersistentDataType.BYTE, bool(state.allowFlight()));
         data.set(flyingKey, PersistentDataType.BYTE, bool(state.flying()));
@@ -58,7 +58,16 @@ public final class PlayerRecoveryStore {
             data.set(zKey, PersistentDataType.DOUBLE, location.getZ());
             data.set(yawKey, PersistentDataType.FLOAT, location.getYaw());
             data.set(pitchKey, PersistentDataType.FLOAT, location.getPitch());
+        } else {
+            data.remove(worldKey);
+            data.remove(xKey);
+            data.remove(yKey);
+            data.remove(zKey);
+            data.remove(yawKey);
+            data.remove(pitchKey);
         }
+
+        data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
     }
 
     public boolean hasRecovery(Player player) {
