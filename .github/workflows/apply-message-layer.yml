@@ -17,7 +17,7 @@ jobs:
           persist-credentials: true
 
       - name: Apply message layer patch
-        run: python3 tools/apply_message_layer.py
+        run: python3 tools/apply_message_layer_v2.py
 
       - name: Commit message layer
         shell: bash
