@@ -31,6 +31,12 @@ public final class HoppingVesselController extends GroundVesselController {
         ViewSnapshot view = session.view();
         applyRotation(vessel, view);
 
+        if (session.isMovementControlLocked()) {
+            vessel.setJumping(false);
+            session.lastKnownVesselLocation(vessel.getLocation());
+            return;
+        }
+
         Vector current = vessel.getVelocity();
         Vector direction = MovementMath.horizontal(input, view.yaw());
         boolean moving = direction.lengthSquared() > 0.0001;
