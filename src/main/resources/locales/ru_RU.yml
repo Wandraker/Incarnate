@@ -1,6 +1,6 @@
 messages:
   player-only: '<prefix> <error>Эту команду может использовать только игрок.</error>'
-  usage-incarnate: '<prefix> <muted>Использование:</muted> <text>/incarnate &lt;моб|primary|secondary|inspect&gt;</text>'
+  usage-incarnate: '<prefix> <muted>Использование:</muted> <text>/incarnate &lt;mob|primary|secondary|inspect&gt;</text>'
   permission-create: '<prefix> <error>У вас нет права создавать тела мобов.</error>'
   permission-possess: '<prefix> <error>У вас нет права вселяться в существующих мобов.</error>'
   permission-inspect: '<prefix> <error>У вас нет права проверять управляемые тела.</error>'
