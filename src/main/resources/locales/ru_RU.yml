@@ -1,6 +1,6 @@
 messages:
   player-only: '<prefix> <error>Эту команду может использовать только игрок.</error>'
-  usage-incarnate: '<prefix> <muted>Использование:</muted> <text>/incarnate &lt;mob|primary|secondary|inspect&gt;</text>'
+  usage-incarnate: '<prefix> <muted>Использование:</muted> <text>/incarnate &lt;моб|primary|secondary|inspect&gt;</text>'
   permission-create: '<prefix> <error>У вас нет права создавать тела мобов.</error>'
   permission-possess: '<prefix> <error>У вас нет права вселяться в существующих мобов.</error>'
   permission-inspect: '<prefix> <error>У вас нет права проверять управляемые тела.</error>'
@@ -42,6 +42,14 @@ messages:
   recovered: '<prefix> <success>Состояние восстановлено после прерванной сессии вселения.</success>'
   recovery-pending: '<prefix> <warning>Восстановление ещё не завершено.</warning> <muted>Новое вселение временно заблокировано для безопасности.</muted>'
 
+  hud:
+    line: '<primary>❤</primary> <text><health>/<max_health></text> <dark_gray>•</dark_gray> <muted>ЛКМ:</muted> <accent><primary_action></accent> <primary_state> <dark_gray>•</dark_gray> <muted>F:</muted> <secondary><secondary_action></secondary> <secondary_state>'
+    health-only: '<primary>❤</primary> <text><health>/<max_health></text>'
+    abilities-only: '<muted>ЛКМ:</muted> <accent><primary_action></accent> <primary_state> <dark_gray>•</dark_gray> <muted>F:</muted> <secondary><secondary_action></secondary> <secondary_state>'
+    ready: '<success>ГОТОВО</success>'
+    cooldown: '<warning><seconds>с</warning>'
+    unavailable: '<muted>—</muted>'
+
   camera:
     mounted-free-look: 'свободная камера'
     legacy-spectator-fallback: 'резервная spectator-камера'
@@ -66,6 +74,7 @@ messages:
     pounce: 'прыжок'
     dash: 'ускорение'
     roar: 'рёв'
+    fangs: 'клыки'
 
   origin:
     created: 'создано Incarnate'
