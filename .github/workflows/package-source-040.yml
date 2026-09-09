@@ -1,0 +1,26 @@
+name: Package Incarnate 0.4.0 Source
+
+on:
+  push:
+    paths:
+      - '.github/workflows/package-source-040.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Archive validated 0.4.0 source tree
+        run: |
+          git archive --format=zip --prefix=Incarnate-0.4.0-source/ 95fb430f29170803ef0c8f03aff14818e0c22274 -o Incarnate-0.4.0-source.zip
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Incarnate-0.4.0-source
+          path: Incarnate-0.4.0-source.zip
+          if-no-files-found: error
