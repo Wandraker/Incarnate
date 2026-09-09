@@ -78,7 +78,7 @@ public record VesselState(
         mob.setAggressive(aggressive);
         mob.setGravity(gravity);
 
-        if (target != null && target.isValid() && !target.isDead() && Bukkit.isOwnedByCurrentRegion(target)) {
+        if (target != null && Bukkit.isOwnedByCurrentRegion(target) && target.isValid() && !target.isDead()) {
             mob.setTarget(target);
         }
         if (mob instanceof Sittable sittable && sitting != null) {
