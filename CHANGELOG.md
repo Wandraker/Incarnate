@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0
+
+Mob Identity & Control Update.
+
+- Added a configurable possession actionbar HUD showing the real vessel health plus localized primary/secondary ability labels and live cooldown state.
+- Ability cooldowns are now represented by observable session windows instead of write-only timestamps, so the HUD can show READY versus remaining seconds without changing gameplay timing.
+- Vessel health/max-health telemetry is sampled on the Mob EntityScheduler and exposed to the Player HUD as a snapshot; the Player-side HUD does not read the live Mob cross-region.
+- Primary and secondary capability labels are snapshotted on the vessel-owned thread when possession starts, removing another live Mob read from Player-side camera/HUD messaging.
+- Added a native Evoker secondary ability: a forward line of real `EvokerFangs` entities owned by the possessed Evoker, with the real FANGS spell animation/state and configurable count, spacing, delays and cooldown.
+- Evoker fang placement fails closed at Folia region ownership boundaries and searches downward for valid solid ground before spawning a fang.
+- Spellcaster state is now captured before possession, cleared while controlled, restored on normal release, and persisted through interrupted-session PDC recovery.
+- HUD and Evoker options are additive defaults, so existing `config.yml` tuning remains untouched by the existing non-destructive config migration.
+- Added English and Russian HUD strings plus localized Evoker fang ability labels; locale parity/MiniMessage tests continue to guard both bundles.
+- Added unit coverage for observable cooldown timing, including first-use availability and the cooldown boundary.
+- The 0.3.0 mounted free-look camera, controller concealment, default-deny permission model, recovery architecture and native abilities remain intact.
+- Goat ram is intentionally not exposed yet: Paper's public ram API mutates Goat brain memories, while Incarnate normally suppresses autonomous AI with `aware=false`; exact pre-possession brain memory restoration is not available through the public API.
+
 ## 0.3.0
 
 Free-Look Camera & Mob Polish Update.
