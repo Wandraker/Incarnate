@@ -258,7 +258,7 @@ public final class PossessionManager {
                 return;
             }
 
-            player.sendMessage(Component.text("[Incarnate] Vessel acquired. Shift+F or /release to leave it."));
+            player.sendMessage(Component.text("[Incarnate] Vessel acquired. Left-click: primary, F: secondary, Shift+F: release."));
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
         if (attachTask == null) {
             requestRelease(session, ReleaseReason.QUIT);
@@ -342,6 +342,29 @@ public final class PossessionManager {
             } catch (Throwable ex) {
                 plugin.getLogger().log(Level.SEVERE, "Primary ability failed for " + vessel.getType() + " " + session.vesselId(), ex);
                 notifyPlayer(player, "[Incarnate] This vessel ability failed; possession was kept active.");
+            }
+        }, null);
+        if (abilityTask == null && session.isActive()) {
+            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+        }
+    }
+
+    public void triggerSecondary(Player player) {
+        PossessionSession session = session(player);
+        if (session == null || !session.isActive()) {
+            return;
+        }
+
+        Mob vessel = session.vessel();
+        ScheduledTask abilityTask = vessel.getScheduler().run(plugin, task -> {
+            if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
+                return;
+            }
+            try {
+                abilities.triggerSecondary(session);
+            } catch (Throwable ex) {
+                plugin.getLogger().log(Level.SEVERE, "Secondary ability failed for " + vessel.getType() + " " + session.vesselId(), ex);
+                notifyPlayer(player, "[Incarnate] This vessel secondary ability failed; possession was kept active.");
             }
         }, null);
         if (abilityTask == null && session.isActive()) {
