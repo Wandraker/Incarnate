@@ -265,6 +265,8 @@ public final class AbilityRegistry {
             || !Bukkit.isOwnedByCurrentRegion(target)
             || !target.isValid()
             || target.isDead()
+            || !guardian.getWorld().equals(target.getWorld())
+            || guardian.getLocation().distanceSquared(target.getLocation()) > guardianLaserRange * guardianLaserRange
             || !guardian.hasLineOfSight(target)) {
             guardian.setLaser(false);
             guardian.setTarget(null);
