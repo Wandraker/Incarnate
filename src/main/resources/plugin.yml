@@ -7,9 +7,8 @@ description: True mob incarnation and possession using real server entities.
 folia-supported: true
 commands:
   incarnate:
-    description: Create a real mob body and incarnate into it.
-    usage: /incarnate <mob|primary>
-    permission: incarnate.use.incarnate
+    description: Create a real mob body, trigger abilities, or inspect a controlled vessel.
+    usage: /incarnate <mob|primary|secondary|inspect>
   possess:
     description: Possess the real mob you are looking at.
     usage: /possess
@@ -24,4 +23,6 @@ permissions:
   incarnate.use.possess:
     default: op
   incarnate.use.release:
+    default: op
+  incarnate.admin.inspect:
     default: op
