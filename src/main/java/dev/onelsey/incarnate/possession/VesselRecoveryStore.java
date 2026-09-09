@@ -3,6 +3,7 @@ package dev.onelsey.incarnate.possession;
 import dev.onelsey.incarnate.IncarnatePlugin;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Bat;
+import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Sittable;
@@ -23,6 +24,7 @@ public final class VesselRecoveryStore {
     private final NamespacedKey aggressiveKey;
     private final NamespacedKey gravityKey;
     private final NamespacedKey sittingKey;
+    private final NamespacedKey camelDashingKey;
     private final NamespacedKey batAwakeKey;
     private final NamespacedKey creeperIgnitedKey;
     private final NamespacedKey creeperFuseTicksKey;
@@ -38,6 +40,7 @@ public final class VesselRecoveryStore {
         this.aggressiveKey = new NamespacedKey(plugin, "vessel_recovery_aggressive");
         this.gravityKey = new NamespacedKey(plugin, "vessel_recovery_gravity");
         this.sittingKey = new NamespacedKey(plugin, "vessel_recovery_sitting");
+        this.camelDashingKey = new NamespacedKey(plugin, "vessel_recovery_camel_dashing");
         this.batAwakeKey = new NamespacedKey(plugin, "vessel_recovery_bat_awake");
         this.creeperIgnitedKey = new NamespacedKey(plugin, "vessel_recovery_creeper_ignited");
         this.creeperFuseTicksKey = new NamespacedKey(plugin, "vessel_recovery_creeper_fuse_ticks");
@@ -60,6 +63,7 @@ public final class VesselRecoveryStore {
             data.set(aggressiveKey, PersistentDataType.BYTE, bool(state.aggressive()));
             data.set(gravityKey, PersistentDataType.BYTE, bool(state.gravity()));
             setNullableBool(data, sittingKey, state.sitting());
+            setNullableBool(data, camelDashingKey, state.camelDashing());
             setNullableBool(data, batAwakeKey, state.batAwake());
             setNullableBool(data, creeperIgnitedKey, state.creeperIgnited());
             if (state.creeperFuseTicks() != null) {
@@ -114,6 +118,12 @@ public final class VesselRecoveryStore {
                 sittable.setSitting(sitting);
             }
         }
+        if (mob instanceof Camel camel) {
+            Boolean dashing = readNullableBool(data, camelDashingKey);
+            if (dashing != null) {
+                camel.setDashing(dashing);
+            }
+        }
         if (mob instanceof Bat bat) {
             Boolean awake = readNullableBool(data, batAwakeKey);
             if (awake != null) {
@@ -145,6 +155,7 @@ public final class VesselRecoveryStore {
         data.remove(aggressiveKey);
         data.remove(gravityKey);
         data.remove(sittingKey);
+        data.remove(camelDashingKey);
         data.remove(batAwakeKey);
         data.remove(creeperIgnitedKey);
         data.remove(creeperFuseTicksKey);
