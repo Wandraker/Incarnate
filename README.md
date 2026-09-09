@@ -22,7 +22,7 @@ The build is pinned to Paper API `26.2.build.121-stable`.
 
 - `/incarnate <mob>` - create a real Mob body and enter it.
 - `/possess` - possess the real Mob currently aimed at within the configured distance.
-- `/release` - leave the current body.
+- `/release` - leave the current body or retry a pending recovery.
 - `/incarnate primary` - fallback primary-ability trigger for testing.
 - `/incarnate secondary` - fallback secondary-ability trigger for testing.
 - `/incarnate inspect` - admin-only inspection of the controlled body currently aimed at. It reports the controller, vessel UUID and whether the body was created or possessed without exposing that information visually above the Mob.
@@ -30,7 +30,36 @@ The build is pinned to Paper API `26.2.build.121-stable`.
 - `F` - secondary ability with default keybinds. Technically this is Swap Offhand, so rebinding Swap Offhand also rebinds this control.
 - `Shift + F` - quick release. Technically this is Sneak + Swap Offhand.
 
-`/incarnate inspect` requires `incarnate.admin.inspect`. Creating a body requires `incarnate.use.incarnate`.
+## Permissions
+
+Mob control is opt-in. Ordinary players receive no Incarnate gameplay access by default, and the gameplay permissions below use `default: false`.
+
+Starting a created incarnation requires both:
+
+- `incarnate.use.incarnate`
+- `incarnate.mob.<entity_type>`
+
+Possessing an existing mob requires both:
+
+- `incarnate.use.possess`
+- `incarnate.mob.<entity_type>`
+
+Examples of per-mob permissions:
+
+- `incarnate.mob.skeleton`
+- `incarnate.mob.creeper`
+- `incarnate.mob.enderman`
+- `incarnate.mob.zombie_villager`
+
+`incarnate.mob.*` grants access to every mob type supported by the current Incarnate build. Explicitly excluded types such as Ender Dragon and Shulker remain unavailable even with the wildcard.
+
+This makes the permission model suitable for server ranks or donor perks. For example, a rank can receive `incarnate.use.incarnate` plus only `incarnate.mob.skeleton`, while a higher rank can receive `incarnate.mob.*`. Existing-mob possession can be sold or granted separately through `incarnate.use.possess`.
+
+The per-mob check is enforced in the possession core as well as the commands, so a future alternate command/API path cannot bypass it accidentally. Mob tab completion is also filtered: players only see forms they are allowed to use.
+
+`/release` intentionally has no required permission. If a rank or donor permission is removed while a player is already controlling a body, they must still be able to leave it and complete recovery safely.
+
+`incarnate.admin.inspect` is separate and remains `default: op`.
 
 ## What 0.1.0 implements
 
@@ -44,13 +73,15 @@ Ender Dragon and Shulker are deliberately excluded in 0.1.0.
 
 The hidden Player is not copied into the Mob name. Incarnate blocks Paper entity tracking for concealed controllers and, by default, temporarily removes them from each viewer's tab list.
 
-World concealment uses a short hide/show tracking pulse rather than keeping a long-lived plugin-scoped `hidePlayer` layer. The pulse forces the old Player tracker pairing to be removed, then the `PlayerTrackEntityEvent` guard prevents the controller from being spawned again while possession is active. This avoids leaving a persistent Incarnate hide layer behind after normal release or plugin reload.
+World concealment uses a short hide/show tracking pulse rather than keeping a long-lived plugin-scoped `hidePlayer` layer. The pulse forces the old Player tracker pairing to be removed, then the `PlayerTrackEntityEvent` guard prevents the controller from being spawned again while possession is active.
+
+Per-viewer tab-list ownership is persisted separately so an interrupted plugin reload can restore entries that the previous Incarnate instance removed instead of leaving a player absent from TAB until reconnect.
 
 ### Folia-safe ownership model
 
 Player input is sampled on the Player EntityScheduler. Vessel mutation runs on the Mob EntityScheduler. Cross-region control uses snapshots rather than reading live Player state from the vessel thread.
 
-Interrupted vessel recovery uses a durable UUID index so already-loaded Mob bodies can also be recovered after plugin/server restart instead of depending only on a future entity-load event.
+Entity ray-trace consumers fail closed on Folia ownership before reading or acting on a hit entity. Interrupted vessel recovery uses a durable UUID index so already-loaded Mob bodies can also be recovered after plugin/server restart instead of depending only on a future entity-load event.
 
 ### Movement families
 
@@ -119,7 +150,7 @@ The Player's original game mode, flight permission, flight state, fly speed, wor
 
 ## Validation
 
-GitHub Actions compiles Incarnate with Java 25 against Paper API `26.2.build.121-stable` and runs an actual Paper 26.2 build 121 startup/shutdown smoke test. The smoke test waits for full server startup, sends the normal `stop` command and verifies that Incarnate both enables and disables without plugin exceptions.
+GitHub Actions runs unit tests and compiles Incarnate with Java 25 against Paper API `26.2.build.121-stable`, then runs an actual Paper 26.2 build 121 startup/shutdown smoke test. The smoke test waits for full server startup, sends the normal `stop` command and verifies that Incarnate both enables and disables without plugin exceptions.
 
 Live gameplay testing on Paper/Purpur/Leaf/Folia remains the final validation gate for camera/input feel and individual Mob mechanics.
 
