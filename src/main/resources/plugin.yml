@@ -12,17 +12,19 @@ commands:
   possess:
     description: Possess the real mob you are looking at.
     usage: /possess
-    permission: incarnate.use.possess
   release:
-    description: Leave the current vessel.
+    description: Leave the current vessel or retry a pending recovery.
     usage: /release
-    permission: incarnate.use.release
 permissions:
   incarnate.use.incarnate:
-    default: op
+    description: Allows creating a vessel, subject to per-mob permissions.
+    default: false
   incarnate.use.possess:
-    default: op
-  incarnate.use.release:
-    default: op
+    description: Allows possessing an existing mob, subject to per-mob permissions.
+    default: false
+  incarnate.mob.*:
+    description: Allows every supported Incarnate mob type.
+    default: false
   incarnate.admin.inspect:
+    description: Allows inspecting which player controls an Incarnate vessel.
     default: op
