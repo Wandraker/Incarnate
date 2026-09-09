@@ -31,6 +31,8 @@ public final class PossessionSession {
     private volatile long lastSecondaryAbilityTick = Long.MIN_VALUE;
     private volatile long movementControlLockedUntilTick = Long.MIN_VALUE;
     private volatile boolean guardianLaserActive;
+    private volatile boolean guardianLaserSeenActive;
+    private volatile UUID guardianLaserTargetId;
     private volatile long guardianLaserDeadlineTick = Long.MIN_VALUE;
     private volatile long vexChargeUntilTick = Long.MIN_VALUE;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
@@ -125,10 +127,16 @@ public final class PossessionSession {
 
     public boolean guardianLaserActive() { return guardianLaserActive; }
 
-    public void startGuardianLaser(int timeoutTicks) {
+    public void startGuardianLaser(UUID targetId, int timeoutTicks) {
         guardianLaserActive = true;
+        guardianLaserSeenActive = false;
+        guardianLaserTargetId = targetId;
         guardianLaserDeadlineTick = controlTick + Math.max(1, timeoutTicks);
     }
+
+    public UUID guardianLaserTargetId() { return guardianLaserTargetId; }
+    public boolean guardianLaserSeenActive() { return guardianLaserSeenActive; }
+    public void markGuardianLaserSeenActive() { guardianLaserSeenActive = true; }
 
     public boolean guardianLaserExpired() {
         return guardianLaserActive && guardianLaserDeadlineTick != Long.MIN_VALUE && controlTick > guardianLaserDeadlineTick;
@@ -136,6 +144,8 @@ public final class PossessionSession {
 
     public void clearGuardianLaser() {
         guardianLaserActive = false;
+        guardianLaserSeenActive = false;
+        guardianLaserTargetId = null;
         guardianLaserDeadlineTick = Long.MIN_VALUE;
     }
 

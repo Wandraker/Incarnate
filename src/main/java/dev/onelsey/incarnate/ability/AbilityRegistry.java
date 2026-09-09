@@ -258,7 +258,7 @@ public final class AbilityRegistry {
         guardian.setAware(true);
         guardian.getPathfinder().stopPathfinding();
         guardian.setVelocity(new Vector());
-        session.startGuardianLaser(timeoutTicks);
+        session.startGuardianLaser(target.getUniqueId(), timeoutTicks);
         session.lockMovementControl(timeoutTicks);
         return true;
     }
@@ -270,28 +270,39 @@ public final class AbilityRegistry {
 
         LivingEntity target = guardian.getTarget();
         if (target == null) {
-            guardian.setLaser(false);
-            guardian.setAware(false);
-            session.clearGuardianLaser();
+            finishGuardianLaser(session, guardian);
             return;
         }
 
         if (session.guardianLaserExpired()
             || !Bukkit.isOwnedByCurrentRegion(target)
+            || session.guardianLaserTargetId() == null
+            || !target.getUniqueId().equals(session.guardianLaserTargetId())
             || !target.isValid()
             || target.isDead()
             || !guardian.getWorld().equals(target.getWorld())
             || guardian.getLocation().distanceSquared(target.getLocation()) > guardianLaserRange * guardianLaserRange
             || !guardian.hasLineOfSight(target)) {
-            guardian.setLaser(false);
-            guardian.setTarget(null);
-            guardian.setAware(false);
-            session.clearGuardianLaser();
+            finishGuardianLaser(session, guardian);
+            return;
+        }
+
+        if (guardian.hasLaser()) {
+            session.markGuardianLaserSeenActive();
+        } else if (session.guardianLaserSeenActive()) {
+            finishGuardianLaser(session, guardian);
             return;
         }
 
         guardian.setAware(true);
         guardian.getPathfinder().stopPathfinding();
+    }
+
+    private static void finishGuardianLaser(PossessionSession session, Guardian guardian) {
+        guardian.setLaser(false);
+        guardian.setTarget(null);
+        guardian.setAware(false);
+        session.clearGuardianLaser();
     }
 
     private boolean togglePufferFish(PossessionSession session, PufferFish pufferFish) {
