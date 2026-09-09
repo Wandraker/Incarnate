@@ -6,6 +6,7 @@ import dev.onelsey.incarnate.possession.PossessionSession;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Camel;
 import org.bukkit.entity.Mob;
 import org.bukkit.util.Vector;
 
@@ -39,6 +40,16 @@ public class GroundVesselController implements VesselController {
         InputSnapshot input = session.input();
         ViewSnapshot view = session.view();
         applyRotation(vessel, view);
+
+        if (session.isMovementControlLocked()) {
+            vessel.setJumping(false);
+            session.lastKnownVesselLocation(vessel.getLocation());
+            return;
+        }
+
+        if (vessel instanceof Camel camel && camel.isDashing()) {
+            camel.setDashing(false);
+        }
 
         Vector current = vessel.getVelocity();
         double vertical = preserveVerticalVelocity ? current.getY() : 0.0;
