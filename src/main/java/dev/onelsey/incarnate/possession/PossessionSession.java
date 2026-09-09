@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class PossessionSession {
     private final UUID playerId;
+    private final String playerName;
     private final UUID vesselId;
     private final Player player;
     private final Mob vessel;
@@ -41,6 +42,7 @@ public final class PossessionSession {
         ViewSnapshot initialView
     ) {
         this.playerId = playerId;
+        this.playerName = player.getName();
         this.vesselId = vessel.getUniqueId();
         this.player = player;
         this.vessel = vessel;
@@ -53,6 +55,7 @@ public final class PossessionSession {
     }
 
     public UUID playerId() { return playerId; }
+    public String playerName() { return playerName; }
     public UUID vesselId() { return vesselId; }
     public Player player() { return player; }
     public Mob vessel() { return vessel; }
