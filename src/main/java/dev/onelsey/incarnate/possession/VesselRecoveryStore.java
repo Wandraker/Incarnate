@@ -10,6 +10,7 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Sittable;
+import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.Vex;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -37,6 +38,7 @@ public final class VesselRecoveryStore {
     private final NamespacedKey ravagerAttackTicksKey;
     private final NamespacedKey ravagerStunnedTicksKey;
     private final NamespacedKey ravagerRoarTicksKey;
+    private final NamespacedKey spellcasterSpellKey;
 
     public VesselRecoveryStore(IncarnatePlugin plugin) {
         this.index = new VesselRecoveryIndex(plugin);
@@ -58,6 +60,7 @@ public final class VesselRecoveryStore {
         this.ravagerAttackTicksKey = new NamespacedKey(plugin, "vessel_recovery_ravager_attack_ticks");
         this.ravagerStunnedTicksKey = new NamespacedKey(plugin, "vessel_recovery_ravager_stunned_ticks");
         this.ravagerRoarTicksKey = new NamespacedKey(plugin, "vessel_recovery_ravager_roar_ticks");
+        this.spellcasterSpellKey = new NamespacedKey(plugin, "vessel_recovery_spellcaster_spell");
     }
 
     public void save(Mob mob, PossessionOrigin origin, VesselState state) {
@@ -94,6 +97,11 @@ public final class VesselRecoveryStore {
             setNullableInt(data, ravagerAttackTicksKey, state.ravagerAttackTicks());
             setNullableInt(data, ravagerStunnedTicksKey, state.ravagerStunnedTicks());
             setNullableInt(data, ravagerRoarTicksKey, state.ravagerRoarTicks());
+            if (state.spellcasterSpell() != null) {
+                data.set(spellcasterSpellKey, PersistentDataType.STRING, state.spellcasterSpell().name());
+            } else {
+                data.remove(spellcasterSpellKey);
+            }
             data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
         } catch (RuntimeException ex) {
             index.forget(vesselId);
@@ -181,6 +189,16 @@ public final class VesselRecoveryStore {
             if (stunnedTicks != null) ravager.setStunnedTicks(stunnedTicks);
             if (roarTicks != null) ravager.setRoarTicks(roarTicks);
         }
+        if (mob instanceof Spellcaster spellcaster) {
+            String spellName = data.get(spellcasterSpellKey, PersistentDataType.STRING);
+            if (spellName != null) {
+                try {
+                    spellcaster.setSpell(Spellcaster.Spell.valueOf(spellName));
+                } catch (IllegalArgumentException ignored) {
+                    spellcaster.setSpell(Spellcaster.Spell.NONE);
+                }
+            }
+        }
         if (mob instanceof Guardian guardian) {
             guardian.setLaser(false);
         }
@@ -210,6 +228,7 @@ public final class VesselRecoveryStore {
         data.remove(ravagerAttackTicksKey);
         data.remove(ravagerStunnedTicksKey);
         data.remove(ravagerRoarTicksKey);
+        data.remove(spellcasterSpellKey);
         index.forget(vesselId);
     }
 
