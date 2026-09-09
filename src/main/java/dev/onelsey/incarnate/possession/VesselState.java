@@ -1,7 +1,9 @@
 package dev.onelsey.incarnate.possession;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Creeper;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 
 public record VesselState(
@@ -11,6 +13,7 @@ public record VesselState(
     boolean removeWhenFarAway,
     boolean aggressive,
     boolean gravity,
+    LivingEntity target,
     Boolean batAwake,
     Boolean creeperIgnited,
     Integer creeperFuseTicks
@@ -27,6 +30,7 @@ public record VesselState(
             mob.getRemoveWhenFarAway(),
             mob.isAggressive(),
             mob.hasGravity(),
+            mob.getTarget(),
             batAwake,
             creeperIgnited,
             creeperFuseTicks
@@ -59,6 +63,10 @@ public record VesselState(
         mob.setRemoveWhenFarAway(removeWhenFarAway);
         mob.setAggressive(aggressive);
         mob.setGravity(gravity);
+
+        if (target != null && target.isValid() && !target.isDead() && Bukkit.isOwnedByCurrentRegion(target)) {
+            mob.setTarget(target);
+        }
 
         if (mob instanceof Bat bat && batAwake != null) {
             bat.setAwake(batAwake);
