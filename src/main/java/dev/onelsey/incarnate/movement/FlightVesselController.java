@@ -39,6 +39,11 @@ public final class FlightVesselController implements VesselController {
         vessel.setJumping(false);
         vessel.setGravity(false);
 
+        if (session.isMovementControlLocked()) {
+            session.lastKnownVesselLocation(vessel.getLocation());
+            return;
+        }
+
         double vertical = (input.jump() ? 1.0 : 0.0) - (input.sneak() ? 1.0 : 0.0);
         Vector wanted = MovementMath.threeDimensional(input, view, vertical);
         Vector current = vessel.getVelocity();
