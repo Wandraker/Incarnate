@@ -82,7 +82,7 @@ The Player's original game mode, flight permission, flight state and fly speed a
 
 ## Validation
 
-The repository CI compiles Incarnate with Java 25 against the pinned Paper 26.2 API. Live Paper/Purpur/Leaf/Folia runtime testing remains the final validation gate for camera/input behavior and mob-specific mechanics.
+GitHub Actions compiles Incarnate with Java 25 against Paper API `26.2.build.121-stable` and runs a startup smoke test on an actual Paper 26.2 build 121 server. Live gameplay testing on Paper/Purpur/Leaf/Folia remains the final validation gate for camera/input behavior and mob-specific mechanics.
 
 ## Build
 
@@ -92,4 +92,17 @@ Install JDK 25 and Gradle, then run:
 gradle build
 ```
 
-Release source archives intentionally contain no plugin JAR or compiled `.class` files. CI compiles classes for validation but does not publish build artifacts.
+Release source archives intentionally contain no plugin JAR or compiled `.class` files. CI may build a temporary JAR for validation but does not publish that validation artifact.
+
+## License
+
+Incarnate is proprietary software distributed under the **Incarnate All Rights Reserved License v1.0**.
+
+In short:
+
+- official releases may be downloaded and used, including on monetized Minecraft servers;
+- exact, complete and unmodified official release packages may be shared free of charge;
+- modified builds, rebranding, derivative versions and redistributed forks are not permitted without prior written permission from Onelsey;
+- all rights not explicitly granted remain reserved.
+
+See [`LICENSE`](LICENSE) for the complete terms.
