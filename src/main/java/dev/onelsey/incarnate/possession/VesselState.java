@@ -10,6 +10,7 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Sittable;
+import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.Vex;
 
 public record VesselState(
@@ -31,7 +32,8 @@ public record VesselState(
     Boolean vexCharging,
     Integer ravagerAttackTicks,
     Integer ravagerStunnedTicks,
-    Integer ravagerRoarTicks
+    Integer ravagerRoarTicks,
+    Spellcaster.Spell spellcasterSpell
 ) {
     public static VesselState capture(Mob mob) {
         Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
@@ -46,6 +48,7 @@ public record VesselState(
         Integer ravagerAttackTicks = mob instanceof Ravager ravager ? ravager.getAttackTicks() : null;
         Integer ravagerStunnedTicks = mob instanceof Ravager ravager ? ravager.getStunnedTicks() : null;
         Integer ravagerRoarTicks = mob instanceof Ravager ravager ? ravager.getRoarTicks() : null;
+        Spellcaster.Spell spellcasterSpell = mob instanceof Spellcaster spellcaster ? spellcaster.getSpell() : null;
 
         return new VesselState(
             mob.isAware(),
@@ -66,7 +69,8 @@ public record VesselState(
             vexCharging,
             ravagerAttackTicks,
             ravagerStunnedTicks,
-            ravagerRoarTicks
+            ravagerRoarTicks,
+            spellcasterSpell
         );
     }
 
@@ -100,6 +104,9 @@ public record VesselState(
             ravager.setAttackTicks(-1);
             ravager.setStunnedTicks(-1);
             ravager.setRoarTicks(-1);
+        }
+        if (mob instanceof Spellcaster spellcaster) {
+            spellcaster.setSpell(Spellcaster.Spell.NONE);
         }
     }
 
@@ -142,6 +149,9 @@ public record VesselState(
             ravager.setAttackTicks(ravagerAttackTicks);
             ravager.setStunnedTicks(ravagerStunnedTicks);
             ravager.setRoarTicks(ravagerRoarTicks);
+        }
+        if (mob instanceof Spellcaster spellcaster && spellcasterSpell != null) {
+            spellcaster.setSpell(spellcasterSpell);
         }
         if (mob instanceof Guardian guardian) {
             guardian.setLaser(false);
