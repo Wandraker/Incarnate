@@ -33,11 +33,13 @@ import java.util.concurrent.TimeUnit;
 public final class SessionListener implements Listener {
     private final PossessionManager possessions;
     private final boolean releaseHotkey;
+    private final boolean secondaryHotkey;
     private final long spectatorShiftLatchNanos;
 
     public SessionListener(IncarnatePlugin plugin, PossessionManager possessions) {
         this.possessions = possessions;
         this.releaseHotkey = plugin.getConfig().getBoolean("release-key.shift-swap-offhand", true);
+        this.secondaryHotkey = plugin.getConfig().getBoolean("secondary-key.swap-offhand", true);
         long latchMillis = Math.max(100L, plugin.getConfig().getLong("release-key.spectator-shift-latch-ms", 650L));
         this.spectatorShiftLatchNanos = TimeUnit.MILLISECONDS.toNanos(latchMillis);
     }
@@ -103,23 +105,25 @@ public final class SessionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onSwap(PlayerSwapHandItemsEvent event) {
-        if (!releaseHotkey) {
-            return;
-        }
         PossessionSession session = possessions.session(event.getPlayer());
-        if (session == null) {
+        if (session == null || !session.isActive()) {
             return;
         }
 
         boolean sneak = session.input().sneak()
             || event.getPlayer().isSneaking()
             || session.hasRecentSpectatorShiftAttempt(spectatorShiftLatchNanos);
-        if (!sneak) {
+
+        if (releaseHotkey && sneak) {
+            event.setCancelled(true);
+            possessions.requestRelease(session, ReleaseReason.HOTKEY);
             return;
         }
 
-        event.setCancelled(true);
-        possessions.requestRelease(session, ReleaseReason.HOTKEY);
+        if (secondaryHotkey) {
+            event.setCancelled(true);
+            possessions.triggerSecondary(event.getPlayer());
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
