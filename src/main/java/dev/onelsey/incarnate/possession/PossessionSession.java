@@ -11,9 +11,11 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class PossessionSession {
     private final UUID playerId;
@@ -28,6 +30,8 @@ public final class PossessionSession {
     private final AtomicBoolean active = new AtomicBoolean(true);
     private final CooldownWindow primaryCooldown = new CooldownWindow();
     private final CooldownWindow secondaryCooldown = new CooldownWindow();
+    private final AtomicBoolean dragonTransferInProgress = new AtomicBoolean(false);
+    private final AtomicReference<Vector> dragonControlMotion = new AtomicReference<>(new Vector());
 
     private volatile InputSnapshot input;
     private volatile ViewSnapshot view;
@@ -140,6 +144,26 @@ public final class PossessionSession {
     public boolean usesSpectatorTargetCamera() { return cameraTransport == CameraTransport.SPECTATOR_TARGET; }
     public boolean cameraTeleportInProgress() { return cameraTeleportInProgress; }
     public void cameraTeleportInProgress(boolean value) { this.cameraTeleportInProgress = value; }
+
+    public Vector dragonControlMotion() {
+        return dragonControlMotion.get().clone();
+    }
+
+    public void dragonControlMotion(Vector motion) {
+        dragonControlMotion.set(motion == null ? new Vector() : motion.clone());
+    }
+
+    public boolean dragonTransferInProgress() {
+        return dragonTransferInProgress.get();
+    }
+
+    public boolean beginDragonTransfer() {
+        return dragonTransferInProgress.compareAndSet(false, true);
+    }
+
+    public void endDragonTransfer() {
+        dragonTransferInProgress.set(false);
+    }
 
     public long controlTick() { return controlTick; }
     public long advanceControlTick() { return ++controlTick; }

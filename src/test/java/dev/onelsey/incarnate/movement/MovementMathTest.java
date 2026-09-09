@@ -46,6 +46,15 @@ final class MovementMathTest {
     }
 
     @Test
+    void dragonBodyYawCompensatesForVanillaDragonFacing() {
+        assertEquals(-180.0f, MovementMath.dragonBodyYaw(0.0f), 0.0001f);
+        assertEquals(-90.0f, MovementMath.dragonBodyYaw(90.0f), 0.0001f);
+        assertEquals(90.0f, MovementMath.dragonBodyYaw(-90.0f), 0.0001f);
+        assertEquals(-1.0f, MovementMath.dragonBodyYaw(179.0f), 0.0001f);
+        assertEquals(1.0f, MovementMath.dragonBodyYaw(-179.0f), 0.0001f);
+    }
+
+    @Test
     void pitchIsClamped() {
         assertEquals(90.0f, MovementMath.clampPitch(120.0f));
         assertEquals(-90.0f, MovementMath.clampPitch(-120.0f));

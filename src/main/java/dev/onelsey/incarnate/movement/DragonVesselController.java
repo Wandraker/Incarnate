@@ -3,12 +3,17 @@ package dev.onelsey.incarnate.movement;
 import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.ViewSnapshot;
 import dev.onelsey.incarnate.possession.PossessionSession;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Mob;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.util.Vector;
 
 public final class DragonVesselController implements VesselController {
+    private static final double MOTION_EPSILON_SQUARED = 1.0E-6;
+
     private final double speed;
     private final double sprintMultiplier;
     private final double acceleration;
@@ -31,6 +36,8 @@ public final class DragonVesselController implements VesselController {
 
         InputSnapshot input = session.input();
         ViewSnapshot view = session.view();
+        float bodyYaw = MovementMath.dragonBodyYaw(view.yaw());
+        float bodyPitch = MovementMath.clampPitch(view.pitch());
 
         if (dragon.getPhase() != EnderDragon.Phase.HOVER) {
             dragon.setPhase(EnderDragon.Phase.HOVER);
@@ -38,10 +45,16 @@ public final class DragonVesselController implements VesselController {
         dragon.setAware(false);
         dragon.setTarget(null);
         dragon.setGravity(false);
-        dragon.setRotation(view.yaw(), MovementMath.clampPitch(view.pitch()));
-        dragon.setBodyYaw(view.yaw());
+        dragon.setRotation(bodyYaw, bodyPitch);
+        dragon.setBodyYaw(bodyYaw);
+
+        if (session.dragonTransferInProgress()) {
+            dragon.setVelocity(new Vector());
+            return;
+        }
 
         if (session.isMovementControlLocked()) {
+            session.dragonControlMotion(new Vector());
             dragon.setVelocity(new Vector());
             session.lastKnownVesselLocation(dragon.getLocation());
             return;
@@ -49,20 +62,57 @@ public final class DragonVesselController implements VesselController {
 
         double vertical = (input.jump() ? 1.0 : 0.0) - (input.sneak() ? 1.0 : 0.0);
         Vector wanted = MovementMath.threeDimensional(input, view, vertical);
-        Vector current = dragon.getVelocity();
+        Vector motion = session.dragonControlMotion();
 
         if (wanted.lengthSquared() > 0.0001) {
             double targetSpeed = speed * (input.sprint() ? sprintMultiplier : 1.0);
             double control = dragon.getNoDamageTicks() > 0 ? acceleration * hurtControl : acceleration;
             wanted.multiply(targetSpeed);
-            current.setX(MovementMath.lerp(current.getX(), wanted.getX(), control));
-            current.setY(MovementMath.lerp(current.getY(), wanted.getY(), control));
-            current.setZ(MovementMath.lerp(current.getZ(), wanted.getZ(), control));
-        } else if (dragon.getNoDamageTicks() == 0) {
-            current.multiply(idleDamping);
+            motion.setX(MovementMath.lerp(motion.getX(), wanted.getX(), control));
+            motion.setY(MovementMath.lerp(motion.getY(), wanted.getY(), control));
+            motion.setZ(MovementMath.lerp(motion.getZ(), wanted.getZ(), control));
+        } else {
+            motion.multiply(idleDamping);
         }
 
-        dragon.setVelocity(current);
-        session.lastKnownVesselLocation(dragon.getLocation());
+        if (motion.lengthSquared() < MOTION_EPSILON_SQUARED) {
+            motion.zero();
+        }
+        session.dragonControlMotion(motion);
+
+        // HOVER intentionally remains active so vanilla podium/portal routing stays disabled.
+        // Its own phase target is the current position, so Bukkit velocity alone is consumed by
+        // the dragon flight controller. Move the real entity explicitly and keep vanilla delta
+        // motion zero so the phase cannot apply the same displacement a second time.
+        dragon.setVelocity(new Vector());
+        if (motion.lengthSquared() < MOTION_EPSILON_SQUARED) {
+            session.lastKnownVesselLocation(dragon.getLocation());
+            return;
+        }
+
+        Location target = dragon.getLocation().add(motion);
+        target.setYaw(bodyYaw);
+        target.setPitch(bodyPitch);
+
+        if (Bukkit.isOwnedByCurrentRegion(target)) {
+            boolean moved = dragon.teleport(target, PlayerTeleportEvent.TeleportCause.PLUGIN);
+            if (!moved) {
+                session.dragonControlMotion(new Vector());
+            }
+            dragon.setVelocity(new Vector());
+            session.lastKnownVesselLocation(dragon.getLocation());
+            return;
+        }
+
+        if (!session.beginDragonTransfer()) {
+            return;
+        }
+
+        dragon.teleportAsync(target, PlayerTeleportEvent.TeleportCause.PLUGIN).whenComplete((success, error) -> {
+            if (error != null || !Boolean.TRUE.equals(success)) {
+                session.dragonControlMotion(new Vector());
+            }
+            session.endDragonTransfer();
+        });
     }
 }
