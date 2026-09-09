@@ -55,7 +55,7 @@ jobs:
         with:
           gradle-version: '9.6.1'
 
-      - name: Build temporary plugin jar
+      - name: Build plugin jar
         run: gradle clean jar --stacktrace --warning-mode all
 
       - name: Download Paper 26.2 build 121
@@ -150,3 +150,11 @@ jobs:
           if grep -E 'Error occurred while enabling Incarnate|Error occurred while disabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate|IllegalPluginAccessException' paper-smoke.log; then
             exit 1
           fi
+
+      - name: Upload validated Incarnate JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: Incarnate-0.2.0
+          path: build/libs/Incarnate-0.2.0.jar
+          if-no-files-found: error
+          retention-days: 30
