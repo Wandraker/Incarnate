@@ -11,6 +11,7 @@ import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Blaze;
 import org.bukkit.entity.Breeze;
 import org.bukkit.entity.BreezeWindCharge;
+import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Ghast;
@@ -53,6 +54,12 @@ public final class AbilityRegistry {
     private final double spiderPounceHorizontalSpeed;
     private final double spiderPounceVerticalVelocity;
     private final int spiderPounceCooldownTicks;
+    private final int spiderPounceLockTicks;
+    private final boolean camelDashEnabled;
+    private final double camelDashHorizontalSpeed;
+    private final double camelDashVerticalVelocity;
+    private final int camelDashCooldownTicks;
+    private final int camelDashLockTicks;
 
     public AbilityRegistry(FileConfiguration config) {
         this.skeletonEnabled = config.getBoolean("abilities.skeleton.enabled", true);
@@ -75,6 +82,12 @@ public final class AbilityRegistry {
         this.spiderPounceHorizontalSpeed = Math.max(0.05, config.getDouble("abilities.spider-pounce.horizontal-speed", 0.85));
         this.spiderPounceVerticalVelocity = Math.max(0.05, config.getDouble("abilities.spider-pounce.vertical-velocity", 0.42));
         this.spiderPounceCooldownTicks = Math.max(1, config.getInt("abilities.spider-pounce.cooldown-ticks", 18));
+        this.spiderPounceLockTicks = Math.max(1, config.getInt("abilities.spider-pounce.movement-lock-ticks", 5));
+        this.camelDashEnabled = config.getBoolean("abilities.camel-dash.enabled", true);
+        this.camelDashHorizontalSpeed = Math.max(0.05, config.getDouble("abilities.camel-dash.horizontal-speed", 1.15));
+        this.camelDashVerticalVelocity = Math.max(0.0, config.getDouble("abilities.camel-dash.vertical-velocity", 0.12));
+        this.camelDashCooldownTicks = Math.max(1, config.getInt("abilities.camel-dash.cooldown-ticks", 30));
+        this.camelDashLockTicks = Math.max(1, config.getInt("abilities.camel-dash.movement-lock-ticks", 8));
     }
 
     public boolean triggerPrimary(PossessionSession session) {
@@ -109,6 +122,9 @@ public final class AbilityRegistry {
         }
         if (vessel instanceof Spider spider && spiderPounceEnabled) {
             return pounceSpider(session, spider);
+        }
+        if (vessel instanceof Camel camel && camelDashEnabled) {
+            return dashCamel(session, camel);
         }
         return false;
     }
@@ -199,6 +215,7 @@ public final class AbilityRegistry {
         }
 
         enderman.setVelocity(new Vector());
+        session.lockMovementControl(3);
         enderman.teleportAsync(safe);
         return true;
     }
@@ -215,7 +232,27 @@ public final class AbilityRegistry {
         }
         horizontal.normalize().multiply(spiderPounceHorizontalSpeed);
         horizontal.setY(spiderPounceVerticalVelocity);
+        session.lockMovementControl(spiderPounceLockTicks);
         spider.setVelocity(horizontal);
+        return true;
+    }
+
+    private boolean dashCamel(PossessionSession session, Camel camel) {
+        if (!camel.isOnGround() || !session.acquireSecondaryCooldown(camelDashCooldownTicks)) {
+            return false;
+        }
+
+        Vector horizontal = direction(session.view());
+        horizontal.setY(0.0);
+        if (horizontal.lengthSquared() < 1.0E-6) {
+            return false;
+        }
+
+        horizontal.normalize().multiply(camelDashHorizontalSpeed);
+        horizontal.setY(Math.max(camel.getVelocity().getY(), camelDashVerticalVelocity));
+        camel.setDashing(true);
+        session.lockMovementControl(camelDashLockTicks);
+        camel.setVelocity(horizontal);
         return true;
     }
 
