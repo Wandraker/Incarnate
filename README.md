@@ -94,7 +94,7 @@ When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible 
 
 This means tuned movement speeds, cooldowns, camera choices, release behavior, excluded mobs and other existing settings are not reset merely because a later release adds new options.
 
-## What 0.3.0 implements
+## What 0.4.0 implements
 
 ### Real bodies
 
@@ -104,11 +104,9 @@ Ender Dragon and Shulker are deliberately excluded.
 
 ### Free-look camera
 
-0.3.0 changes the default camera transport.
+The default camera transport remains the mounted free-look architecture introduced in 0.3.0.
 
 Instead of directly attaching the client camera to the Mob through `setSpectatorTarget`, the hidden spectator Player is moved to the vessel and mounted on the real Mob while remaining its own camera. This is designed to preserve normal mouse/touch yaw and pitch input while the Mob body follows that view direction.
-
-The camera configuration is:
 
 ```yaml
 camera:
@@ -117,11 +115,31 @@ camera:
   fallback-to-spectator-target: true
 ```
 
-`MOUNTED` is the new default. `SPECTATOR_TARGET` remains available as a compatibility mode/fallback. Mounted acquisition uses Player and Mob EntitySchedulers and retries region-safe attachment before falling back or releasing safely.
+`SPECTATOR_TARGET` remains available as a compatibility fallback. Mounted acquisition uses Player and Mob EntitySchedulers and retries region-safe attachment before falling back or releasing safely.
 
 Dismount input is guarded during possession, and release/quit/death/plugin-disable paths explicitly detach the hidden Player before state restoration or recovery teleportation.
 
-The mounted camera is a major architecture change and still requires live client testing across representative mob types before being considered gameplay-final.
+The mounted camera still requires live client testing across representative mob sizes and server implementations before being considered gameplay-final.
+
+### Possession HUD
+
+0.4.0 adds a localized actionbar HUD while possession is active. By default it shows:
+
+- the real Mob body's current and maximum health;
+- the localized left-click ability;
+- the localized `F` ability;
+- whether each ability is ready or how much cooldown remains.
+
+```yaml
+hud:
+  actionbar:
+    enabled: true
+    interval-ticks: 4
+    show-health: true
+    show-abilities: true
+```
+
+Vessel health and capability information is snapshotted from the Mob-owned thread. The Player-side HUD consumes those snapshots instead of reading the live Mob cross-region. Cooldowns are now observable session state, so the UI does not need to guess whether an ability is ready.
 
 ### Controller privacy
 
@@ -131,7 +149,7 @@ World concealment uses a short hide/show tracking pulse plus `PlayerTrackEntityE
 
 ### Folia-oriented ownership model
 
-Player input is sampled on the Player EntityScheduler. Vessel mutation runs on the Mob EntityScheduler. Cross-region control uses snapshots rather than live Player reads from the vessel thread.
+Player input and HUD delivery run on the Player EntityScheduler. Vessel mutation, capability detection and vessel telemetry run on the Mob EntityScheduler. Cross-region control uses snapshots rather than live Player/Mob reads from the opposite region thread.
 
 Entity ray-trace consumers fail closed on Folia ownership before acting on a hit entity. Interrupted vessel recovery uses a durable UUID index so already-loaded bodies can also recover after restart/reload.
 
@@ -151,7 +169,7 @@ Ground bodies use real `MOVEMENT_SPEED` and `JUMP_STRENGTH` where available. Fly
 
 Burst abilities use a short movement-control lock so normal WASD processing does not immediately erase their physical impulse.
 
-The control loop also centrally records the latest vessel position every successful tick for safer emergency/recovery exits.
+The control loop centrally records the latest vessel position every successful tick for safer emergency/recovery exits.
 
 ### Primary abilities
 
@@ -177,7 +195,7 @@ Other mobs use a real Mob melee attack when a living target is under the vessel 
 
 ### Secondary abilities
 
-Secondary abilities have a separate cooldown channel.
+Secondary abilities have their own cooldown channel.
 
 Implemented:
 
@@ -186,15 +204,24 @@ Implemented:
 - Camel - real dashing state plus physical dash impulse;
 - PufferFish - real puff-state toggle;
 - Vex - real charging state plus 3D charge impulse;
-- Ravager - native roar using the real Ravager roar state and vanilla/Paper damage behavior.
+- Ravager - native roar using the real Ravager roar state and vanilla/Paper damage behavior;
+- Evoker - a forward line of real `EvokerFangs` entities owned by the Evoker, with the real FANGS spell state and staggered attack delays.
+
+Evoker fang placement checks current Folia region ownership and only creates fangs where a valid ground location can be found. Count, spacing, attack-delay step, cast window and cooldown are configurable.
 
 More mob-specific abilities can be added without changing the possession core.
+
+### Why Goat ram is not exposed yet
+
+Paper provides a Goat ram API, but its implementation writes directly into Goat Brain RAM memories and activates the RAM activity. Incarnate normally controls mobs with real AI enabled but `aware=false`, which suppresses normal AI ticking. The public API does not expose the exact previous RAM brain memory state needed to restore an arbitrary existing Goat after possession.
+
+Incarnate therefore does not currently expose Goat ram rather than leaving a possessed existing mob with silently modified brain state after `/release`.
 
 ## Recovery
 
 Before taking over an existing Mob, Incarnate stores its original AI/awareness/persistence/despawn/aggressive/gravity and relevant special state in PDC. Interrupted sessions can recover marked vessels when they load again. Created orphan vessels are removed by default.
 
-Special-state restoration includes sitting state, Bat awake state, Camel dash, Creeper ignition/fuse progress, Guardian laser handling, PufferFish puff state, Vex charging state and Ravager attack/stun/roar ticks.
+Special-state restoration includes sitting state, Bat awake state, Camel dash, Creeper ignition/fuse progress, Guardian laser handling, PufferFish puff state, Vex charging state, Ravager attack/stun/roar ticks and the current Spellcaster spell state used by Evoker/other spellcasters.
 
 On normal release, a pre-possession combat target is restored only when it is still alive and safely owned by the same Folia region.
 
@@ -202,9 +229,9 @@ The Player's original game mode, flight permission/state, fly speed, world, loca
 
 ### AI suppression note
 
-0.3.0 keeps the real Mob AI flag enabled but normally sets a controlled body to unaware. This is currently the safest public-API approach to suppress autonomous pathfinding without making the entity immobile, but Paper notes that unaware mobs can also lose some autonomous/environmental behavior.
+0.4.0 keeps the real Mob AI flag enabled but normally sets a controlled body to unaware. This is currently the safest public-API approach to suppress autonomous pathfinding without making the entity immobile, but Paper notes that unaware mobs can also lose some autonomous/environmental behavior.
 
-Abilities that genuinely need vanilla AI are handled narrowly. Guardian laser temporarily enables awareness only for its bounded attack window with a locked target/movement policy, then returns the body to unaware.
+Abilities that genuinely need vanilla AI are handled narrowly. Guardian laser temporarily enables awareness only for its bounded attack window with a locked target/movement policy, then returns the body to unaware. Evoker fangs do not require enabling autonomous AI; Incarnate creates the real fang entities directly while using the Evoker's native spell state for presentation.
 
 The original awareness state is restored on release and interrupted-session recovery.
 
@@ -212,11 +239,11 @@ The original awareness state is restored on release and interrupted-session reco
 
 GitHub Actions runs unit tests and compiles Incarnate with Java 25 against Paper API `26.2.build.121-stable`, then starts a real Paper 26.2 build 121 server and performs a graceful startup/shutdown smoke test.
 
-The test suite also validates that bundled locales expose the same message keys, bundled MiniMessage templates parse successfully, and config migration adds new defaults without replacing existing tuned values.
+The test suite validates bundled locale key parity, MiniMessage parsing, non-destructive config migration and observable cooldown timing.
 
 Validated CI builds expose the built JAR as a workflow artifact after the Paper smoke test passes.
 
-Live gameplay testing remains the final gate for camera feel, mounted-camera behavior and individual Mob mechanics.
+Live gameplay testing remains the final gate for mounted-camera feel, actionbar readability and individual Mob mechanics.
 
 ## Build
 
