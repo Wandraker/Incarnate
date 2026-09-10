@@ -18,12 +18,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerInputEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -159,14 +161,30 @@ public final class SessionListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPrimary(PlayerArmSwingEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
-        PossessionSession session = possessions.session(event.getPlayer());
+        triggerPrimaryGesture(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPrimaryInteract(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+        Action action = event.getAction();
+        if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) {
+            return;
+        }
+        triggerPrimaryGesture(event.getPlayer());
+    }
+
+    private void triggerPrimaryGesture(Player player) {
+        PossessionSession session = possessions.session(player);
         if (session != null && session.isActive()) {
-            possessions.triggerGesture(event.getPlayer(), primaryGesture(event.getPlayer(), session));
+            possessions.triggerGesture(player, primaryGesture(player, session));
         }
     }
 
