@@ -5,6 +5,7 @@ import dev.onelsey.incarnate.command.IncarnateCommand;
 import dev.onelsey.incarnate.command.PossessCommand;
 import dev.onelsey.incarnate.command.ReleaseCommand;
 import dev.onelsey.incarnate.config.ConfigMigrator;
+import dev.onelsey.incarnate.input.PrimaryInputDeduplicator;
 import dev.onelsey.incarnate.input.SpectatorPrimaryInputBridge;
 import dev.onelsey.incarnate.listener.SessionListener;
 import dev.onelsey.incarnate.message.MessageService;
@@ -50,9 +51,14 @@ public final class IncarnatePlugin extends JavaPlugin {
         ));
         Objects.requireNonNull(getCommand("release")).setExecutor(new ReleaseCommand(possessions, messages));
 
-        SessionListener sessionListener = new SessionListener(this, possessions);
+        PrimaryInputDeduplicator primaryInputDeduplicator = new PrimaryInputDeduplicator();
+        SessionListener sessionListener = new SessionListener(this, possessions, primaryInputDeduplicator);
         getServer().getPluginManager().registerEvents(sessionListener, this);
-        spectatorPrimaryInputBridge = new SpectatorPrimaryInputBridge(this, sessionListener::triggerPrimaryFromTransport);
+        spectatorPrimaryInputBridge = new SpectatorPrimaryInputBridge(
+            this,
+            primaryInputDeduplicator,
+            sessionListener::triggerPrimaryFromPacket
+        );
         spectatorPrimaryInputBridge.start();
 
         possessions.recoverIndexedVessels();
