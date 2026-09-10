@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          fetch-depth: 8
+          fetch-depth: 12
       - name: Set up Java 25
         uses: actions/setup-java@v6
         with:
@@ -31,13 +31,14 @@ jobs:
         run: |
           python3 .github/scripts/apply_090.py
           python3 .github/scripts/fix_090_test.py
+          python3 .github/scripts/fix_090_config_test.py
       - name: Verify Java 25 build
         run: gradle clean test classes --stacktrace --warning-mode all
       - name: Commit source changes
         shell: bash
         run: |
           git show b8b8869ffd15c2ca8e0d726ac6b98ee2ea212a09:.github/workflows/ci.yml > .github/workflows/ci.yml
-          rm -f .github/scripts/apply_090.py .github/scripts/fix_090_test.py
+          rm -f .github/scripts/apply_090.py .github/scripts/fix_090_test.py .github/scripts/fix_090_config_test.py
           git config user.name Onelsey
           git config user.email 103017546+Wandraker@users.noreply.github.com
           git add -A
