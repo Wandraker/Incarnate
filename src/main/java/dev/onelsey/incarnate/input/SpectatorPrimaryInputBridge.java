@@ -16,7 +16,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
-import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -95,7 +94,7 @@ public final class SpectatorPrimaryInputBridge implements Listener {
                         @Override
                         public void channelRead(ChannelHandlerContext context, Object message) throws Exception {
                             try {
-                                if (isNoTargetSpectatorAction(message)) {
+                                if (isSpectatorPrimaryAction(message)) {
                                     dispatchPrimary(player);
                                 }
                             } catch (Throwable ex) {
@@ -158,24 +157,8 @@ public final class SpectatorPrimaryInputBridge implements Listener {
         throw new NoSuchFieldException(owner.getClass().getName() + '#' + name);
     }
 
-    static boolean isNoTargetSpectatorAction(Object packet) {
-        if (packet == null || !PACKET_SIMPLE_NAME.equals(packet.getClass().getSimpleName())) {
-            return false;
-        }
-        for (Class<?> type = packet.getClass(); type != null; type = type.getSuperclass()) {
-            for (Field field : type.getDeclaredFields()) {
-                if (field.getType() != OptionalInt.class || !field.trySetAccessible()) {
-                    continue;
-                }
-                try {
-                    Object value = field.get(packet);
-                    return value instanceof OptionalInt optional && optional.isEmpty();
-                } catch (IllegalAccessException ignored) {
-                    return false;
-                }
-            }
-        }
-        return false;
+    static boolean isSpectatorPrimaryAction(Object packet) {
+        return packet != null && PACKET_SIMPLE_NAME.equals(packet.getClass().getSimpleName());
     }
 
     private void removeHandler(Channel channel) {
