@@ -316,7 +316,7 @@ public final class PossessionManager {
             player.setGameMode(GameMode.SPECTATOR);
             try {
                 player.setSpectatorTarget(null);
-            } catch (IllegalStateException ignored) {
+            } catch (IllegalStateException | IllegalArgumentException ignored) {
             }
 
             if (cameraMode == CameraTransport.SPECTATOR_TARGET) {
@@ -447,7 +447,7 @@ public final class PossessionManager {
             session.cameraTransport(CameraTransport.SPECTATOR_TARGET);
             try {
                 player.setSpectatorTarget(vessel);
-            } catch (IllegalStateException ex) {
+            } catch (IllegalStateException | IllegalArgumentException ex) {
                 requestRelease(session, ReleaseReason.VESSEL_REMOVED);
                 return;
             }
@@ -792,7 +792,7 @@ public final class PossessionManager {
             if (player.getGameMode() == GameMode.SPECTATOR) {
                 try {
                     player.setSpectatorTarget(null);
-                } catch (IllegalStateException ignored) {
+                } catch (IllegalStateException | IllegalArgumentException ignored) {
                 }
             }
             session.cameraTeleportInProgress(false);
@@ -855,7 +855,7 @@ public final class PossessionManager {
         if (player.getGameMode() == GameMode.SPECTATOR) {
             try {
                 player.setSpectatorTarget(null);
-            } catch (IllegalStateException ignored) {
+            } catch (IllegalStateException | IllegalArgumentException ignored) {
             }
         }
         restorePlayerState(player, session.playerState());
@@ -1001,7 +1001,7 @@ public final class PossessionManager {
                 if (player.getGameMode() == GameMode.SPECTATOR) {
                     try {
                         player.setSpectatorTarget(null);
-                    } catch (IllegalStateException ignored) {
+                    } catch (IllegalStateException | IllegalArgumentException ignored) {
                     }
                 }
                 restorePlayerState(player, session.playerState());

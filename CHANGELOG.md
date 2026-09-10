@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.0 - Body States & Mobility
+
+- Builds directly on the 0.7.1 Dragon/control and Leaf recovery hotfixes.
+- Adds reversible Axolotl `playingDead` possession state with an `F` toggle and movement suppression while playing dead.
+- Adds Fox body-state capture/recovery for crouching, sleeping, interested, leaping, defending and faceplanted states.
+- Adds Fox `Sprint + LMB` pounce and `F` sleep/wake controls with bounded transient state cleanup.
+- Adds Panda body-state capture/recovery for rolling, sneezing and on-back states plus a controlled native roll action on `F`.
+- Deliberately leaves Panda eating untouched because its setter has additional vanilla state/item preconditions and is not treated as unconditionally reversible.
+- Persists the new reversible body-state snapshots through interrupted-session vessel recovery.
+- Hardens all spectator-target camera/release paths for Paper/Leaf implementations that signal invalid spectator state with either `IllegalStateException` or `IllegalArgumentException`.
+- Advances additive configuration schema to 5 without replacing existing user values.
+
+
 ## 0.7.0
 
 Warden Senses update.

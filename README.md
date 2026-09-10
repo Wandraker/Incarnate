@@ -94,7 +94,7 @@ When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible 
 
 This means tuned movement speeds, cooldowns, camera choices, release behavior, excluded mobs and other existing settings are not reset merely because a later release adds new options.
 
-## What 0.7.0 implements
+## What 0.8.0 implements
 
 ### Real bodies
 
@@ -176,6 +176,16 @@ input:
 A mob only consumes a special gesture when it has a dedicated native action for it; otherwise the gesture falls back to the ordinary primary action. This keeps existing mobs compatible while giving complex bodies additional control slots. True attack-button hold/release semantics are deliberately not emulated from repeated arm-swing packets because Paper does not expose a reliable held-left-click state.
 
 Frog is the first vessel using the extra channel: normal left click remains melee while `Shift + left click` uses its native tongue target API.
+
+### Reversible body states and mobility
+
+0.8.0 expands possession beyond generic movement by preserving more native Mob body state rather than replacing it with synthetic effects.
+
+- Axolotl: `F` toggles the real `playingDead` flag. Controlled movement is suppressed while the body is playing dead.
+- Fox: normal left click remains melee, `Sprint + left click` performs a bounded pounce using the real leaping state and physical velocity, and `F` toggles sleep/wake. Crouching, sleeping, interested, leaping, defending and faceplanted state are captured and restored.
+- Panda: `F` starts a bounded real rolling state with physical motion. Rolling, sneezing and on-back state are captured and restored.
+
+These states are also written into interrupted-session vessel recovery. Panda eating is intentionally not changed or persisted by Incarnate because the public setter has additional vanilla preconditions; Incarnate avoids claiming exact restoration where it cannot guarantee it.
 
 ### Movement families
 
