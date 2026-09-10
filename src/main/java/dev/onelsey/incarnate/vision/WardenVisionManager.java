@@ -98,11 +98,7 @@ public final class WardenVisionManager {
         boolean hidden = initialHidden(session, entity);
         target.desiredHidden.set(hidden);
         if (hidden) {
-            try {
-                viewer.hideEntity(plugin, entity);
-                target.appliedHidden.set(true);
-            } catch (RuntimeException ignored) {
-            }
+            queueVisibilityUpdate(state, target);
             return true;
         }
 
@@ -244,33 +240,39 @@ public final class WardenVisionManager {
             return;
         }
         Player player = state.session.player();
-        ScheduledTask task = player.getScheduler().run(plugin, scheduled -> {
-            try {
-                if (states.get(state.session.playerId()) != state || !state.session.isActive() || !player.isOnline()) {
-                    return;
-                }
-                boolean hidden = target.desiredHidden.get();
+        ScheduledTask task;
+        try {
+            task = player.getScheduler().run(plugin, scheduled -> {
                 try {
-                    if (hidden) {
-                        player.hideEntity(plugin, target.entity);
-                    } else {
-                        player.showEntity(plugin, target.entity);
+                    if (states.get(state.session.playerId()) != state || !state.session.isActive() || !player.isOnline()) {
+                        return;
                     }
-                    target.appliedHidden.set(hidden);
-                } catch (RuntimeException ignored) {
+                    boolean hidden = target.desiredHidden.get();
+                    try {
+                        if (hidden) {
+                            player.hideEntity(plugin, target.entity);
+                        } else {
+                            player.showEntity(plugin, target.entity);
+                        }
+                        target.appliedHidden.set(hidden);
+                    } catch (RuntimeException ignored) {
+                    }
+                } finally {
+                    target.updateQueued.set(false);
+                    if (target.retired.get() && !target.appliedHidden.get()) {
+                        removeTarget(state, target, false);
+                        return;
+                    }
+                    if (states.get(state.session.playerId()) == state
+                        && target.desiredHidden.get() != target.appliedHidden.get()) {
+                        queueVisibilityUpdate(state, target);
+                    }
                 }
-            } finally {
-                target.updateQueued.set(false);
-                if (target.retired.get() && !target.appliedHidden.get()) {
-                    removeTarget(state, target, false);
-                    return;
-                }
-                if (states.get(state.session.playerId()) == state
-                    && target.desiredHidden.get() != target.appliedHidden.get()) {
-                    queueVisibilityUpdate(state, target);
-                }
-            }
-        }, () -> target.updateQueued.set(false));
+            }, () -> target.updateQueued.set(false));
+        } catch (RuntimeException ex) {
+            target.updateQueued.set(false);
+            return;
+        }
         if (task == null) {
             target.updateQueued.set(false);
         }
@@ -300,18 +302,33 @@ public final class WardenVisionManager {
             return;
         }
 
-        player.getScheduler().run(plugin, task -> {
-            for (TargetState target : state.targets.values()) {
-                if (target.appliedHidden.get() || target.desiredHidden.get()) {
-                    try {
-                        player.showEntity(plugin, target.entity);
-                    } catch (RuntimeException ignored) {
-                    }
+        Runnable restore = () -> restoreClientState(state, player);
+        if (Bukkit.isOwnedByCurrentRegion(player)) {
+            restore.run();
+            return;
+        }
+
+        try {
+            ScheduledTask task = player.getScheduler().run(plugin, scheduled -> restore.run(), () -> state.targets.clear());
+            if (task == null) {
+                state.targets.clear();
+            }
+        } catch (RuntimeException ex) {
+            state.targets.clear();
+        }
+    }
+
+    private void restoreClientState(VisionState state, Player player) {
+        for (TargetState target : state.targets.values()) {
+            if (target.appliedHidden.get() || target.desiredHidden.get()) {
+                try {
+                    player.showEntity(plugin, target.entity);
+                } catch (RuntimeException ignored) {
                 }
             }
-            state.targets.clear();
-            restoreRealDarkness(player);
-        }, () -> state.targets.clear());
+        }
+        state.targets.clear();
+        restoreRealDarkness(player);
     }
 
     private void removeTarget(VisionState state, TargetState target, boolean keepVisibilityUpdate) {
@@ -332,11 +349,14 @@ public final class WardenVisionManager {
             return;
         }
         Player player = state.session.player();
-        player.getScheduler().runDelayed(plugin, task -> {
-            if (states.get(state.session.playerId()) == state && state.session.isActive() && player.isOnline()) {
-                applyVisualDarkness(player);
-            }
-        }, null, Math.max(1L, delayTicks + 1L));
+        try {
+            player.getScheduler().runDelayed(plugin, task -> {
+                if (states.get(state.session.playerId()) == state && state.session.isActive() && player.isOnline()) {
+                    applyVisualDarkness(player);
+                }
+            }, null, Math.max(1L, delayTicks + 1L));
+        } catch (RuntimeException ignored) {
+        }
     }
 
     private void applyVisualDarkness(Player player) {
