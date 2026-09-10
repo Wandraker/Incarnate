@@ -72,7 +72,6 @@ jobs:
               "    private static boolean bodyStateLocksMovement(Mob vessel) {\n        return vessel instanceof Axolotl axolotl && axolotl.isPlayingDead()\n            || vessel instanceof Fox fox && fox.isSleeping();\n    }",
               "    private static boolean bodyStateLocksMovement(PossessionSession session, Mob vessel) {\n        return vessel instanceof Axolotl axolotl && (session.axolotlPlayingDeadControlled() || axolotl.isPlayingDead())\n            || vessel instanceof Fox fox && (session.foxSleepingControlled() || fox.isSleeping());\n    }")
           PY
-          ./gradlew test build --no-daemon
           rm .github/workflows/refine-080.yml
           git config user.name "Onelsey"
           git config user.email "103017546+Wandraker@users.noreply.github.com"
