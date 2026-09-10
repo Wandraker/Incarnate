@@ -303,7 +303,7 @@ public final class SessionListener implements Listener {
 
     @EventHandler
     public void onControllerDeath(PlayerDeathEvent event) {
-        wardenVision.deactivate(event.getEntity(), false);
+        wardenVision.deactivate(event.getEntity(), true);
         possessions.releaseOnControllerDeath(event.getEntity());
     }
 
