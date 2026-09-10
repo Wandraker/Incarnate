@@ -16,12 +16,14 @@ class ConfigMigratorTest {
         user.set("control.release-at-vessel", false);
 
         YamlConfiguration defaults = new YamlConfiguration();
-        defaults.set("config-version", 5);
+        defaults.set("config-version", 6);
         defaults.set("movement.ground.maximum-walk-speed", 0.55);
         defaults.set("abilities.skeleton.cooldown-ticks", 12);
         defaults.set("control.release-at-vessel", true);
         defaults.set("camera.mode", "MOUNTED");
         defaults.set("camera.mount-retries", 8);
+        defaults.set("vision.warden.enabled", true);
+        defaults.set("vision.warden.entity-hard-limit", 12.0);
 
         assertTrue(ConfigMigrator.mergeMissing(user, defaults));
         assertEquals(0.41, user.getDouble("movement.ground.maximum-walk-speed"));
@@ -29,17 +31,19 @@ class ConfigMigratorTest {
         assertFalse(user.getBoolean("control.release-at-vessel"));
         assertEquals("MOUNTED", user.getString("camera.mode"));
         assertEquals(8, user.getInt("camera.mount-retries"));
-        assertEquals(5, user.getInt("config-version"));
+        assertTrue(user.getBoolean("vision.warden.enabled"));
+        assertEquals(12.0, user.getDouble("vision.warden.entity-hard-limit"));
+        assertEquals(6, user.getInt("config-version"));
     }
 
     @Test
     void mergeIsNoOpOnceAllKeysExist() {
         YamlConfiguration user = new YamlConfiguration();
-        user.set("config-version", 5);
+        user.set("config-version", 6);
         user.set("camera.mode", "SPECTATOR_TARGET");
 
         YamlConfiguration defaults = new YamlConfiguration();
-        defaults.set("config-version", 5);
+        defaults.set("config-version", 6);
         defaults.set("camera.mode", "MOUNTED");
 
         assertFalse(ConfigMigrator.mergeMissing(user, defaults));
@@ -53,7 +57,7 @@ class ConfigMigratorTest {
         user.set("excluded-types", java.util.List.of("ENDER_DRAGON", "SHULKER"));
 
         assertTrue(ConfigMigrator.migrateSchema(user, 1));
-        assertEquals(5, user.getInt("config-version"));
+        assertEquals(6, user.getInt("config-version"));
         assertTrue(user.getStringList("excluded-types").isEmpty());
     }
 
@@ -64,7 +68,7 @@ class ConfigMigratorTest {
         user.set("input.gestures.sneak-primary", false);
 
         assertTrue(ConfigMigrator.migrateSchema(user, 2));
-        assertEquals(5, user.getInt("config-version"));
+        assertEquals(6, user.getInt("config-version"));
         assertFalse(user.getBoolean("input.gestures.sneak-primary"));
     }
 
@@ -75,7 +79,7 @@ class ConfigMigratorTest {
         user.set("excluded-types", java.util.List.of("ENDER_DRAGON", "SHULKER", "WARDEN"));
 
         assertTrue(ConfigMigrator.migrateSchema(user, 1));
-        assertEquals(5, user.getInt("config-version"));
+        assertEquals(6, user.getInt("config-version"));
         assertEquals(java.util.List.of("ENDER_DRAGON", "SHULKER", "WARDEN"), user.getStringList("excluded-types"));
     }
 }
