@@ -45,7 +45,10 @@ class MessageResourcesTest {
         assertEquals(1, messages.getInt("config-version"));
 
         YamlConfiguration config = load("src/main/resources/config.yml");
-        assertEquals(5, config.getInt("config-version"));
+        assertEquals(6, config.getInt("config-version"));
+        assertTrue(config.getBoolean("vision.warden.enabled"));
+        assertEquals(12.0, config.getDouble("vision.warden.entity-hard-limit"));
+        assertTrue(config.getInt("vision.warden.evaluation-interval-ticks") >= 1);
     }
 
     @Test
