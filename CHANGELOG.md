@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.0 - Body States & Mobility
+## 0.8.0-alpha.1 - Body States & Mobility
 
 - Builds directly on the 0.7.1 Dragon/control and Leaf recovery hotfixes.
 - Adds reversible Axolotl `playingDead` possession state with an `F` toggle and movement suppression while playing dead.
