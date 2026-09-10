@@ -1,19 +1,33 @@
 # Changelog
 
-## 0.8.0-alpha.1 - Body States & Mobility
+## 0.8.1-alpha.2 - Spectator Primary Input
+
+- Fixes the Minecraft 26.2 no-target left-click path used while the hidden possession controller is in spectator mode.
+- Adds a read-only spectator input bridge for `ServerboundSpectatorActionPacket` actions that contain no entity target, covering primary abilities used against air such as Creeper fuse control and Ender Dragon fireballs.
+- Raw network input is immediately handed back to the Player EntityScheduler before any possession state or Bukkit entity state is read, preserving the Folia player/vessel thread split.
+- The bridge never cancels or rewrites packets and checks for the vanilla `packet_handler` before injection; unsupported pipeline layouts fail closed and retain the existing Bukkit input fallbacks.
+- Keeps the normal arm-swing, interact and spectator-target event paths for compatible clicks and entity-targeted spectator actions.
+- Does not require PacketEvents, ProtocolLib or another runtime plugin.
+
+## 0.8.1-alpha.1 - Input & Body-State Stability
+
+- Makes controlled Axolotl play-dead and Fox sleep states session-authoritative while possession is active so vanilla ticking cannot silently desynchronize movement and body state.
+- Keeps Fox pounce leaping and Panda rolling native flags active for their bounded action windows.
+- Hardens ordinary Bukkit/Paper primary input listeners by accepting cancelled arm-swing events and adding a left-click air/block interaction fallback.
+- Preserves the original pre-possession Mob state as the restoration source.
+- Includes the Leaf/Paper spectator recovery hardening and additive config schema 5 behavior from the 0.8 line.
+
+## 0.8.0 - Body States & Mobility
 
 - Builds directly on the 0.7.1 Dragon/control and Leaf recovery hotfixes.
 - Adds reversible Axolotl `playingDead` possession state with an `F` toggle and movement suppression while playing dead.
 - Adds Fox body-state capture/recovery for crouching, sleeping, interested, leaping, defending and faceplanted states.
 - Adds Fox `Sprint + LMB` pounce and `F` sleep/wake controls with bounded transient state cleanup.
 - Adds Panda body-state capture/recovery for rolling, sneezing and on-back states plus a controlled native roll action on `F`.
-- Controlled Axolotl play-dead and Fox sleep states are now session-authoritative while possessed, preventing vanilla state drift from silently desynchronizing movement and ability behavior.
-- Fox pounce and Panda roll reassert their native transient body flags for the bounded action window, so a server tick cannot prematurely erase the visible/native state while Incarnate still considers the action active.
 - Deliberately leaves Panda eating untouched because its setter has additional vanilla state/item preconditions and is not treated as unconditionally reversible.
 - Persists the new reversible body-state snapshots through interrupted-session vessel recovery.
-- Hardens all spectator-target camera/release paths for Paper/Leaf implementations that signal invalid spectator state with either `IllegalStateException` or `IllegalArgumentException`.
+- Hardens spectator-target camera/release paths for Paper/Leaf implementations that signal invalid spectator state with either `IllegalStateException` or `IllegalArgumentException`.
 - Advances additive configuration schema to 5 without replacing existing user values.
-
 
 ## 0.7.0
 
