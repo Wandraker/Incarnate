@@ -27,6 +27,7 @@ public final class SpectatorPrimaryInputBridge implements Listener {
     private static final String PLAYER_ACTION_PACKET_SIMPLE_NAME = "ServerboundPlayerActionPacket";
     private static final String SWAP_OFFHAND_ACTION = "SWAP_ITEM_WITH_OFFHAND";
     private static final String VANILLA_PACKET_HANDLER = "packet_handler";
+    private static final int MAX_INJECTION_ATTEMPTS = 5;
 
     private final IncarnatePlugin plugin;
     private final PrimaryInputDeduplicator deduplicator;
@@ -85,64 +86,80 @@ public final class SpectatorPrimaryInputBridge implements Listener {
             if (!player.isOnline() || channels.containsKey(player.getUniqueId())) {
                 return;
             }
-            if (!inject(player) && attempt < 4) {
-                scheduleInjection(player, attempt + 1);
-            }
+            inject(player, attempt);
         }, null, attempt == 0 ? 1L : 2L);
     }
 
-    private boolean inject(Player player) {
+    private void inject(Player player, int attempt) {
+        final Channel channel;
         try {
-            Channel channel = resolveChannel(player);
-            if (channel == null) {
-                return false;
+            channel = resolveChannel(player);
+        } catch (Throwable ex) {
+            retryOrWarn(player, attempt, "player network channel could not be resolved", ex);
+            return;
+        }
+        if (channel == null) {
+            retryOrWarn(player, attempt, "player network channel was not available", null);
+            return;
+        }
+
+        Runnable install = () -> {
+            if (!player.isOnline() || channels.containsKey(player.getUniqueId())) {
+                return;
             }
-            Runnable install = () -> {
-                try {
-                    ChannelPipeline pipeline = channel.pipeline();
-                    if (pipeline.get(HANDLER_NAME) != null) {
-                        pipeline.remove(HANDLER_NAME);
-                    }
-                    if (pipeline.context(VANILLA_PACKET_HANDLER) == null) {
-                        warnUnavailable("vanilla packet_handler was not found in the player pipeline", null);
-                        return;
-                    }
-                    pipeline.addBefore(VANILLA_PACKET_HANDLER, HANDLER_NAME, new ChannelDuplexHandler() {
-                        @Override
-                        public void channelRead(ChannelHandlerContext context, Object message) throws Exception {
-                            try {
-                                long nowNanos = System.nanoTime();
-                                if (isSpectatorPrimaryAction(message)) {
-                                    deduplicator.markSpectatorPacket(player.getUniqueId(), nowNanos);
-                                    dispatchPrimary(player);
-                                } else if (isSwapOffhandAction(message)) {
-                                    secondaryInputDeduplicator.markPacket(player.getUniqueId(), nowNanos);
-                                    dispatchSecondary(player);
-                                }
-                            } catch (Throwable ex) {
-                                warnUnavailable("spectator primary packet decoding failed", ex);
-                            }
-                            super.channelRead(context, message);
-                        }
-                    });
-                    channels.put(player.getUniqueId(), channel);
-                } catch (Throwable ex) {
-                    warnUnavailable("spectator primary pipeline injection failed", ex);
+            try {
+                ChannelPipeline pipeline = channel.pipeline();
+                if (pipeline.get(HANDLER_NAME) != null) {
+                    pipeline.remove(HANDLER_NAME);
                 }
-            };
+                if (pipeline.context(VANILLA_PACKET_HANDLER) == null) {
+                    retryOrWarn(player, attempt, "vanilla packet_handler was not found in the player pipeline", null);
+                    return;
+                }
+                pipeline.addBefore(VANILLA_PACKET_HANDLER, HANDLER_NAME, new ChannelDuplexHandler() {
+                    @Override
+                    public void channelRead(ChannelHandlerContext context, Object message) throws Exception {
+                        try {
+                            long nowNanos = System.nanoTime();
+                            if (isSpectatorPrimaryAction(message)) {
+                                deduplicator.markSpectatorPacket(player.getUniqueId(), nowNanos);
+                                dispatchPrimary(player);
+                            } else if (isSwapOffhandAction(message)) {
+                                secondaryInputDeduplicator.markPacket(player.getUniqueId(), nowNanos);
+                                dispatchSecondary(player);
+                            }
+                        } catch (Throwable ex) {
+                            warnUnavailable("spectator input packet decoding failed", ex);
+                        }
+                        super.channelRead(context, message);
+                    }
+                });
+                channels.put(player.getUniqueId(), channel);
+            } catch (Throwable ex) {
+                retryOrWarn(player, attempt, "spectator input pipeline injection failed", ex);
+            }
+        };
+
+        try {
             if (channel.eventLoop().inEventLoop()) {
                 install.run();
             } else {
                 channel.eventLoop().execute(install);
             }
-            return true;
         } catch (Throwable ex) {
-            if (attemptable(ex)) {
-                return false;
-            }
-            warnUnavailable("player network channel could not be resolved", ex);
-            return false;
+            retryOrWarn(player, attempt, "spectator input event-loop dispatch failed", ex);
         }
+    }
+
+    private void retryOrWarn(Player player, int attempt, String reason, Throwable throwable) {
+        if (!player.isOnline() || channels.containsKey(player.getUniqueId())) {
+            return;
+        }
+        if (attempt + 1 < MAX_INJECTION_ATTEMPTS) {
+            scheduleInjection(player, attempt + 1);
+            return;
+        }
+        warnUnavailable(reason, throwable);
     }
 
     private void dispatchPrimary(Player player) {
@@ -222,22 +239,21 @@ public final class SpectatorPrimaryInputBridge implements Listener {
             } catch (Throwable ignored) {
             }
         };
-        if (channel.eventLoop().inEventLoop()) {
-            remove.run();
-        } else {
-            channel.eventLoop().execute(remove);
+        try {
+            if (channel.eventLoop().inEventLoop()) {
+                remove.run();
+            } else {
+                channel.eventLoop().execute(remove);
+            }
+        } catch (Throwable ignored) {
         }
-    }
-
-    private static boolean attemptable(Throwable throwable) {
-        return throwable instanceof NoSuchFieldException || throwable instanceof IllegalAccessException;
     }
 
     private void warnUnavailable(String reason, Throwable throwable) {
         if (!warnedUnavailable.compareAndSet(false, true)) {
             return;
         }
-        String message = "Minecraft 26.2 spectator primary input bridge unavailable: " + reason + ". Bukkit input fallbacks remain active.";
+        String message = "Minecraft 26.2 spectator input bridge unavailable: " + reason + ". Bukkit input fallbacks remain active.";
         if (throwable == null) {
             plugin.getLogger().warning(message);
         } else {
