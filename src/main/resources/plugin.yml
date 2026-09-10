@@ -3,7 +3,7 @@ version: 0.8.1-alpha.4
 main: dev.onelsey.incarnate.IncarnatePlugin
 api-version: '26.2'
 authors: [Onelsey]
-description: True mob incarnation and possession using real server entities.
+description: True mob incarnation and possession using real server entities and native abilities.
 folia-supported: true
 commands:
   incarnate:
