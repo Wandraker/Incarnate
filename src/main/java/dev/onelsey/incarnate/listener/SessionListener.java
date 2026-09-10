@@ -12,8 +12,10 @@ import dev.onelsey.incarnate.input.SecondaryInputTransport;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionSession;
 import dev.onelsey.incarnate.possession.ReleaseReason;
+import dev.onelsey.incarnate.vision.WardenVisionManager;
 import io.papermc.paper.event.player.PlayerArmSwingEvent;
 import io.papermc.paper.event.player.PlayerTrackEntityEvent;
+import io.papermc.paper.event.player.PlayerUntrackEntityEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Tag;
 import org.bukkit.entity.Entity;
@@ -46,6 +48,7 @@ public final class SessionListener implements Listener {
     private final PossessionManager possessions;
     private final PrimaryInputDeduplicator primaryInputDeduplicator;
     private final SecondaryInputDeduplicator secondaryInputDeduplicator;
+    private final WardenVisionManager wardenVision;
     private final boolean releaseHotkey;
     private final boolean secondaryHotkey;
     private final boolean sneakPrimaryGesture;
@@ -56,11 +59,13 @@ public final class SessionListener implements Listener {
         IncarnatePlugin plugin,
         PossessionManager possessions,
         PrimaryInputDeduplicator primaryInputDeduplicator,
-        SecondaryInputDeduplicator secondaryInputDeduplicator
+        SecondaryInputDeduplicator secondaryInputDeduplicator,
+        WardenVisionManager wardenVision
     ) {
         this.possessions = possessions;
         this.primaryInputDeduplicator = primaryInputDeduplicator;
         this.secondaryInputDeduplicator = secondaryInputDeduplicator;
+        this.wardenVision = wardenVision;
         this.releaseHotkey = plugin.getConfig().getBoolean("release-key.shift-swap-offhand", true);
         this.secondaryHotkey = plugin.getConfig().getBoolean("secondary-key.swap-offhand", true);
         this.sneakPrimaryGesture = plugin.getConfig().getBoolean("input.gestures.sneak-primary", true);
@@ -72,13 +77,23 @@ public final class SessionListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onGameModeChange(PlayerGameModeChangeEvent event) {
         PossessionSession session = possessions.session(event.getPlayer());
-        if (session != null && session.isActive() && event.getNewGameMode() != org.bukkit.GameMode.SPECTATOR) {
-            event.setCancelled(true);
+        if (session != null && session.isActive()) {
+            if (event.getNewGameMode() != org.bukkit.GameMode.SPECTATOR) {
+                event.setCancelled(true);
+                return;
+            }
+            wardenVision.ensureActive(session);
+            return;
         }
+        wardenVision.deactivate(event.getPlayer(), true);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onInput(PlayerInputEvent event) {
+        PossessionSession session = possessions.session(event.getPlayer());
+        if (session != null && session.isActive()) {
+            wardenVision.ensureActive(session);
+        }
         possessions.updateInput(event.getPlayer(), InputSnapshot.from(event.getInput()));
     }
 
@@ -101,6 +116,10 @@ public final class SessionListener implements Listener {
     public void onView(PlayerMoveEvent event) {
         if (event.getTo() == null || !possessions.isPossessing(event.getPlayer())) {
             return;
+        }
+        PossessionSession session = possessions.session(event.getPlayer());
+        if (session != null && session.isActive()) {
+            wardenVision.ensureActive(session);
         }
         if (event.getFrom().getYaw() == event.getTo().getYaw() && event.getFrom().getPitch() == event.getTo().getPitch()) {
             return;
@@ -267,11 +286,24 @@ public final class SessionListener implements Listener {
             && possessions.isControllerConcealed(controller.getUniqueId())
             && !event.getPlayer().getUniqueId().equals(controller.getUniqueId())) {
             event.setCancelled(true);
+            return;
         }
+
+        PossessionSession session = possessions.session(event.getPlayer());
+        if (session != null && session.isActive()
+            && wardenVision.filterTrack(session, event.getPlayer(), event.getEntity())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onUntrackEntity(PlayerUntrackEntityEvent event) {
+        wardenVision.onUntrack(event.getPlayer(), event.getEntity());
     }
 
     @EventHandler
     public void onControllerDeath(PlayerDeathEvent event) {
+        wardenVision.deactivate(event.getEntity(), false);
         possessions.releaseOnControllerDeath(event.getEntity());
     }
 
@@ -315,6 +347,7 @@ public final class SessionListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         primaryInputDeduplicator.clear(event.getPlayer().getUniqueId());
         secondaryInputDeduplicator.clear(event.getPlayer().getUniqueId());
+        wardenVision.deactivate(event.getPlayer(), false);
         possessions.releaseOnQuit(event.getPlayer());
     }
 
