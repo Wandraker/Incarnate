@@ -2,7 +2,7 @@ name: Java 25 CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev/0.9.0-warden-mob-expansion ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
