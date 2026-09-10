@@ -1,0 +1,225 @@
+name: Prepare Incarnate 0.8.0 body states
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev/0.8.0-body-states
+    paths:
+      - .github/workflows/prepare-080.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev/0.8.0-body-states
+          fetch-depth: 0
+      - name: Apply 0.8.0 body-state milestone
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def patch(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"missing patch anchor in {path}: {old[:80]!r}")
+              if text.count(old) != 1:
+                  raise SystemExit(f"non-unique patch anchor in {path}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          path = "src/main/java/dev/onelsey/incarnate/possession/VesselState.java"
+          patch(path,
+              "import org.bukkit.entity.Bat;\nimport org.bukkit.entity.Camel;",
+              "import org.bukkit.entity.Axolotl;\nimport org.bukkit.entity.Bat;\nimport org.bukkit.entity.Camel;")
+          patch(path,
+              "import org.bukkit.entity.Frog;\nimport org.bukkit.entity.Guardian;",
+              "import org.bukkit.entity.Fox;\nimport org.bukkit.entity.Frog;\nimport org.bukkit.entity.Guardian;")
+          patch(path,
+              "import org.bukkit.entity.Mob;\nimport org.bukkit.entity.PufferFish;",
+              "import org.bukkit.entity.Mob;\nimport org.bukkit.entity.Panda;\nimport org.bukkit.entity.PufferFish;")
+          patch(path,
+              "    Entity frogTongueTarget,\n    Sniffer.State snifferState\n) {",
+              "    Entity frogTongueTarget,\n    Sniffer.State snifferState,\n    Boolean axolotlPlayingDead,\n    Integer foxBodyState,\n    Integer pandaBodyState\n) {")
+          patch(path,
+              "        Entity frogTongueTarget = mob instanceof Frog frog ? frog.getTongueTarget() : null;\n        Sniffer.State snifferState = mob instanceof Sniffer sniffer ? sniffer.getState() : null;",
+              "        Entity frogTongueTarget = mob instanceof Frog frog ? frog.getTongueTarget() : null;\n        Sniffer.State snifferState = mob instanceof Sniffer sniffer ? sniffer.getState() : null;\n        Boolean axolotlPlayingDead = mob instanceof Axolotl axolotl ? axolotl.isPlayingDead() : null;\n        Integer foxBodyState = mob instanceof Fox fox ? BodyStateCodec.captureFox(fox) : null;\n        Integer pandaBodyState = mob instanceof Panda panda ? BodyStateCodec.capturePanda(panda) : null;")
+          patch(path,
+              "            shulkerAttachedFace,\n            frogTongueTarget,\n            snifferState\n        );",
+              "            shulkerAttachedFace,\n            frogTongueTarget,\n            snifferState,\n            axolotlPlayingDead,\n            foxBodyState,\n            pandaBodyState\n        );")
+          patch(path,
+              "        if (mob instanceof Sniffer sniffer) {\n            sniffer.setState(Sniffer.State.IDLING);\n        }",
+              "        if (mob instanceof Sniffer sniffer) {\n            sniffer.setState(Sniffer.State.IDLING);\n        }\n        if (mob instanceof Axolotl axolotl) {\n            axolotl.setPlayingDead(false);\n        }\n        if (mob instanceof Fox fox) {\n            BodyStateCodec.clearFoxForPossession(fox);\n        }\n        if (mob instanceof Panda panda) {\n            BodyStateCodec.clearPandaForPossession(panda);\n        }")
+          patch(path,
+              "        if (mob instanceof Sniffer sniffer && snifferState != null) {\n            sniffer.setState(snifferState);\n        }",
+              "        if (mob instanceof Sniffer sniffer && snifferState != null) {\n            sniffer.setState(snifferState);\n        }\n        if (mob instanceof Axolotl axolotl && axolotlPlayingDead != null) {\n            axolotl.setPlayingDead(axolotlPlayingDead);\n        }\n        if (mob instanceof Fox fox && foxBodyState != null) {\n            BodyStateCodec.restoreFox(fox, foxBodyState);\n        }\n        if (mob instanceof Panda panda && pandaBodyState != null) {\n            BodyStateCodec.restorePanda(panda, pandaBodyState);\n        }")
+
+          path = "src/main/java/dev/onelsey/incarnate/possession/VesselRecoveryStore.java"
+          patch(path,
+              "import org.bukkit.entity.Bat;\nimport org.bukkit.entity.Camel;",
+              "import org.bukkit.entity.Axolotl;\nimport org.bukkit.entity.Bat;\nimport org.bukkit.entity.Camel;")
+          patch(path,
+              "import org.bukkit.entity.Frog;\nimport org.bukkit.entity.Guardian;",
+              "import org.bukkit.entity.Fox;\nimport org.bukkit.entity.Frog;\nimport org.bukkit.entity.Guardian;")
+          patch(path,
+              "import org.bukkit.entity.Mob;\nimport org.bukkit.entity.PufferFish;",
+              "import org.bukkit.entity.Mob;\nimport org.bukkit.entity.Panda;\nimport org.bukkit.entity.PufferFish;")
+          patch(path,
+              "    private final NamespacedKey snifferStateKey;",
+              "    private final NamespacedKey snifferStateKey;\n    private final NamespacedKey axolotlPlayingDeadKey;\n    private final NamespacedKey foxBodyStateKey;\n    private final NamespacedKey pandaBodyStateKey;")
+          patch(path,
+              "        this.snifferStateKey = new NamespacedKey(plugin, \"vessel_recovery_sniffer_state\");",
+              "        this.snifferStateKey = new NamespacedKey(plugin, \"vessel_recovery_sniffer_state\");\n        this.axolotlPlayingDeadKey = new NamespacedKey(plugin, \"vessel_recovery_axolotl_playing_dead\");\n        this.foxBodyStateKey = new NamespacedKey(plugin, \"vessel_recovery_fox_body_state\");\n        this.pandaBodyStateKey = new NamespacedKey(plugin, \"vessel_recovery_panda_body_state\");")
+          patch(path,
+              "            if (state.snifferState() != null) {\n                data.set(snifferStateKey, PersistentDataType.STRING, state.snifferState().name());\n            } else {\n                data.remove(snifferStateKey);\n            }\n            data.set(activeKey, PersistentDataType.BYTE, (byte) 1);",
+              "            if (state.snifferState() != null) {\n                data.set(snifferStateKey, PersistentDataType.STRING, state.snifferState().name());\n            } else {\n                data.remove(snifferStateKey);\n            }\n            setNullableBool(data, axolotlPlayingDeadKey, state.axolotlPlayingDead());\n            setNullableInt(data, foxBodyStateKey, state.foxBodyState());\n            setNullableInt(data, pandaBodyStateKey, state.pandaBodyState());\n            data.set(activeKey, PersistentDataType.BYTE, (byte) 1);")
+          patch(path,
+              "        if (mob instanceof Guardian guardian) {\n            guardian.setLaser(false);\n        }\n\n        clear(mob);",
+              "        if (mob instanceof Guardian guardian) {\n            guardian.setLaser(false);\n        }\n        if (mob instanceof Axolotl axolotl) {\n            Boolean playingDead = readNullableBool(data, axolotlPlayingDeadKey);\n            if (playingDead != null) {\n                axolotl.setPlayingDead(playingDead);\n            }\n        }\n        if (mob instanceof Fox fox) {\n            Integer bodyState = data.get(foxBodyStateKey, PersistentDataType.INTEGER);\n            if (bodyState != null) {\n                BodyStateCodec.restoreFox(fox, bodyState);\n            }\n        }\n        if (mob instanceof Panda panda) {\n            Integer bodyState = data.get(pandaBodyStateKey, PersistentDataType.INTEGER);\n            if (bodyState != null) {\n                BodyStateCodec.restorePanda(panda, bodyState);\n            }\n        }\n\n        clear(mob);")
+          patch(path,
+              "        data.remove(snifferStateKey);\n        index.forget(vesselId);",
+              "        data.remove(snifferStateKey);\n        data.remove(axolotlPlayingDeadKey);\n        data.remove(foxBodyStateKey);\n        data.remove(pandaBodyStateKey);\n        index.forget(vesselId);")
+
+          path = "src/main/java/dev/onelsey/incarnate/possession/PossessionSession.java"
+          patch(path,
+              "    private volatile long frogTongueUntilTick = Long.MIN_VALUE;",
+              "    private volatile long frogTongueUntilTick = Long.MIN_VALUE;\n    private volatile long foxPounceUntilTick = Long.MIN_VALUE;\n    private volatile long pandaRollUntilTick = Long.MIN_VALUE;")
+          patch(path,
+              "    public void clearFrogTongue() {\n        frogTongueTargetId = null;\n        frogTongueUntilTick = Long.MIN_VALUE;\n    }",
+              "    public void clearFrogTongue() {\n        frogTongueTargetId = null;\n        frogTongueUntilTick = Long.MIN_VALUE;\n    }\n\n    public void startFoxPounce(int ticks) {\n        foxPounceUntilTick = controlTick + Math.max(1, ticks);\n    }\n\n    public boolean foxPounceTracked() {\n        return foxPounceUntilTick != Long.MIN_VALUE;\n    }\n\n    public boolean foxPounceExpired() {\n        return foxPounceTracked() && controlTick > foxPounceUntilTick;\n    }\n\n    public void clearFoxPounce() {\n        foxPounceUntilTick = Long.MIN_VALUE;\n    }\n\n    public void startPandaRoll(int ticks) {\n        pandaRollUntilTick = controlTick + Math.max(1, ticks);\n    }\n\n    public boolean pandaRollTracked() {\n        return pandaRollUntilTick != Long.MIN_VALUE;\n    }\n\n    public boolean pandaRollExpired() {\n        return pandaRollTracked() && controlTick > pandaRollUntilTick;\n    }\n\n    public void clearPandaRoll() {\n        pandaRollUntilTick = Long.MIN_VALUE;\n    }")
+
+          path = "src/main/java/dev/onelsey/incarnate/ability/AbilityRegistry.java"
+          patch(path,
+              "import org.bukkit.entity.AbstractSkeleton;\nimport org.bukkit.entity.Arrow;",
+              "import org.bukkit.entity.AbstractSkeleton;\nimport org.bukkit.entity.Arrow;\nimport org.bukkit.entity.Axolotl;")
+          patch(path,
+              "import org.bukkit.entity.Frog;\nimport org.bukkit.entity.Enderman;",
+              "import org.bukkit.entity.Frog;\nimport org.bukkit.entity.Fox;\nimport org.bukkit.entity.Enderman;")
+          patch(path,
+              "import org.bukkit.entity.Mob;\nimport org.bukkit.entity.Piglin;",
+              "import org.bukkit.entity.Mob;\nimport org.bukkit.entity.Panda;\nimport org.bukkit.entity.Piglin;")
+          patch(path,
+              "    private final int frogTongueCooldownTicks;",
+              "    private final int frogTongueCooldownTicks;\n    private final boolean axolotlPlayDeadEnabled;\n    private final int axolotlPlayDeadCooldownTicks;\n    private final boolean foxPounceEnabled;\n    private final double foxPounceHorizontalSpeed;\n    private final double foxPounceVerticalVelocity;\n    private final int foxPounceDurationTicks;\n    private final int foxPounceCooldownTicks;\n    private final int foxPounceLockTicks;\n    private final boolean foxSleepEnabled;\n    private final int foxSleepCooldownTicks;\n    private final boolean pandaRollEnabled;\n    private final double pandaRollSpeed;\n    private final double pandaRollVerticalVelocity;\n    private final int pandaRollDurationTicks;\n    private final int pandaRollCooldownTicks;\n    private final int pandaRollLockTicks;")
+          patch(path,
+              "        this.frogTongueCooldownTicks = Math.max(1, config.getInt(\"abilities.frog-tongue.cooldown-ticks\", 24));\n    }",
+              "        this.frogTongueCooldownTicks = Math.max(1, config.getInt(\"abilities.frog-tongue.cooldown-ticks\", 24));\n        this.axolotlPlayDeadEnabled = config.getBoolean(\"abilities.axolotl-play-dead.enabled\", true);\n        this.axolotlPlayDeadCooldownTicks = Math.max(1, config.getInt(\"abilities.axolotl-play-dead.cooldown-ticks\", 8));\n        this.foxPounceEnabled = config.getBoolean(\"abilities.fox-pounce.enabled\", true);\n        this.foxPounceHorizontalSpeed = Math.max(0.05, config.getDouble(\"abilities.fox-pounce.horizontal-speed\", 0.95));\n        this.foxPounceVerticalVelocity = Math.max(0.05, config.getDouble(\"abilities.fox-pounce.vertical-velocity\", 0.45));\n        this.foxPounceDurationTicks = Math.max(1, config.getInt(\"abilities.fox-pounce.duration-ticks\", 10));\n        this.foxPounceCooldownTicks = Math.max(1, config.getInt(\"abilities.fox-pounce.cooldown-ticks\", 24));\n        this.foxPounceLockTicks = Math.max(1, config.getInt(\"abilities.fox-pounce.movement-lock-ticks\", 6));\n        this.foxSleepEnabled = config.getBoolean(\"abilities.fox-sleep.enabled\", true);\n        this.foxSleepCooldownTicks = Math.max(1, config.getInt(\"abilities.fox-sleep.cooldown-ticks\", 8));\n        this.pandaRollEnabled = config.getBoolean(\"abilities.panda-roll.enabled\", true);\n        this.pandaRollSpeed = Math.max(0.05, config.getDouble(\"abilities.panda-roll.speed\", 0.60));\n        this.pandaRollVerticalVelocity = Math.max(0.0, config.getDouble(\"abilities.panda-roll.vertical-velocity\", 0.10));\n        this.pandaRollDurationTicks = Math.max(1, config.getInt(\"abilities.panda-roll.duration-ticks\", 12));\n        this.pandaRollCooldownTicks = Math.max(1, config.getInt(\"abilities.panda-roll.cooldown-ticks\", 30));\n        this.pandaRollLockTicks = Math.max(1, config.getInt(\"abilities.panda-roll.movement-lock-ticks\", 12));\n    }")
+          patch(path,
+              "            case SNEAK_PRIMARY -> triggerSneakPrimary(session);\n            case SPRINT_PRIMARY -> triggerPrimaryInternal(session);",
+              "            case SNEAK_PRIMARY -> triggerSneakPrimary(session);\n            case SPRINT_PRIMARY -> triggerSprintPrimary(session);")
+          patch(path,
+              "        if (vessel instanceof EnderDragon dragon && dragonFireballEnabled) {",
+              "        if (vessel instanceof Axolotl axolotl && axolotl.isPlayingDead()) {\n            return false;\n        }\n        if (vessel instanceof Fox fox && fox.isSleeping()) {\n            return false;\n        }\n        if (vessel instanceof EnderDragon dragon && dragonFireballEnabled) {")
+          patch(path,
+              "        if (vessel instanceof Shulker shulker && shulkerShellEnabled) {",
+              "        if (vessel instanceof Axolotl axolotl && axolotlPlayDeadEnabled) {\n            return toggleAxolotlPlayDead(session, axolotl);\n        }\n        if (vessel instanceof Fox fox && foxSleepEnabled) {\n            return toggleFoxSleep(session, fox);\n        }\n        if (vessel instanceof Panda panda && pandaRollEnabled) {\n            return rollPanda(session, panda);\n        }\n        if (vessel instanceof Shulker shulker && shulkerShellEnabled) {")
+          patch(path,
+              "    private boolean triggerSneakPrimary(PossessionSession session) {",
+              "    private boolean triggerSprintPrimary(PossessionSession session) {\n        Mob vessel = session.vessel();\n        if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {\n            return false;\n        }\n        if (vessel instanceof Fox fox && foxPounceEnabled) {\n            return pounceFox(session, fox);\n        }\n        return triggerPrimaryInternal(session);\n    }\n\n    private boolean triggerSneakPrimary(PossessionSession session) {")
+          patch(path,
+              "        if (vessel instanceof Frog frog) {\n            tickFrogTongue(session, frog);\n        }\n    }",
+              "        if (vessel instanceof Frog frog) {\n            tickFrogTongue(session, frog);\n        }\n        if (vessel instanceof Fox fox) {\n            tickFoxPounce(session, fox);\n        }\n        if (vessel instanceof Panda panda) {\n            tickPandaRoll(session, panda);\n        }\n    }")
+          patch(path,
+              "        if (vessel instanceof Frog frog && session.frogTongueTracked()) {\n            frog.setTongueTarget(null);\n            session.clearFrogTongue();\n        }\n    }",
+              "        if (vessel instanceof Frog frog && session.frogTongueTracked()) {\n            frog.setTongueTarget(null);\n            session.clearFrogTongue();\n        }\n        if (vessel instanceof Fox fox && session.foxPounceTracked()) {\n            fox.setLeaping(false);\n            session.clearFoxPounce();\n        }\n        if (vessel instanceof Panda panda && session.pandaRollTracked()) {\n            panda.setRolling(false);\n            session.clearPandaRoll();\n        }\n    }")
+          patch(path,
+              "        if (vessel instanceof Frog && frogTongueEnabled) return \"frog-melee-tongue\";",
+              "        if (vessel instanceof Frog && frogTongueEnabled) return \"frog-melee-tongue\";\n        if (vessel instanceof Fox && foxPounceEnabled) return \"fox-melee-pounce\";")
+          patch(path,
+              "        if (vessel instanceof Shulker && shulkerShellEnabled) return \"shulker-shell\";",
+              "        if (vessel instanceof Axolotl && axolotlPlayDeadEnabled) return \"axolotl-play-dead\";\n        if (vessel instanceof Fox && foxSleepEnabled) return \"fox-sleep\";\n        if (vessel instanceof Panda && pandaRollEnabled) return \"panda-roll\";\n        if (vessel instanceof Shulker && shulkerShellEnabled) return \"shulker-shell\";")
+          patch(path,
+              "    private boolean startGuardianLaser(PossessionSession session, Guardian guardian) {",
+              "    private boolean toggleAxolotlPlayDead(PossessionSession session, Axolotl axolotl) {\n        if (!session.acquireSecondaryCooldown(axolotlPlayDeadCooldownTicks)) {\n            return false;\n        }\n        boolean playingDead = !axolotl.isPlayingDead();\n        axolotl.setPlayingDead(playingDead);\n        if (playingDead) {\n            axolotl.setVelocity(new Vector());\n        }\n        return true;\n    }\n\n    private boolean toggleFoxSleep(PossessionSession session, Fox fox) {\n        if (!session.acquireSecondaryCooldown(foxSleepCooldownTicks)) {\n            return false;\n        }\n        if (session.foxPounceTracked()) {\n            fox.setLeaping(false);\n            session.clearFoxPounce();\n        }\n        boolean sleeping = !fox.isSleeping();\n        fox.setCrouching(false);\n        fox.setInterested(false);\n        fox.setFaceplanted(false);\n        fox.setSleeping(sleeping);\n        if (sleeping) {\n            fox.setVelocity(new Vector());\n        }\n        return true;\n    }\n\n    private boolean pounceFox(PossessionSession session, Fox fox) {\n        if (fox.isSleeping() || !fox.isOnGround() || session.foxPounceTracked()) {\n            return false;\n        }\n        Vector horizontal = direction(session.view());\n        horizontal.setY(0.0);\n        if (horizontal.lengthSquared() < 1.0E-6 || !session.acquirePrimaryCooldown(foxPounceCooldownTicks)) {\n            return false;\n        }\n        horizontal.normalize().multiply(foxPounceHorizontalSpeed);\n        horizontal.setY(foxPounceVerticalVelocity);\n        fox.setCrouching(false);\n        fox.setInterested(false);\n        fox.setFaceplanted(false);\n        fox.setLeaping(true);\n        session.startFoxPounce(foxPounceDurationTicks);\n        session.lockMovementControl(foxPounceLockTicks);\n        fox.setVelocity(horizontal);\n        return true;\n    }\n\n    private void tickFoxPounce(PossessionSession session, Fox fox) {\n        if (!session.foxPounceTracked()) {\n            return;\n        }\n        if (session.foxPounceExpired()) {\n            fox.setLeaping(false);\n            session.clearFoxPounce();\n        }\n    }\n\n    private boolean rollPanda(PossessionSession session, Panda panda) {\n        if (!panda.isOnGround() || session.pandaRollTracked()) {\n            return false;\n        }\n        Vector horizontal = direction(session.view());\n        horizontal.setY(0.0);\n        if (horizontal.lengthSquared() < 1.0E-6 || !session.acquireSecondaryCooldown(pandaRollCooldownTicks)) {\n            return false;\n        }\n        horizontal.normalize().multiply(pandaRollSpeed);\n        horizontal.setY(Math.max(panda.getVelocity().getY(), pandaRollVerticalVelocity));\n        panda.setSneezing(false);\n        panda.setOnBack(false);\n        panda.setRolling(true);\n        session.startPandaRoll(pandaRollDurationTicks);\n        session.lockMovementControl(pandaRollLockTicks);\n        panda.setVelocity(horizontal);\n        return true;\n    }\n\n    private void tickPandaRoll(PossessionSession session, Panda panda) {\n        if (!session.pandaRollTracked()) {\n            return;\n        }\n        if (session.pandaRollExpired()) {\n            panda.setRolling(false);\n            session.clearPandaRoll();\n        }\n    }\n\n    private boolean startGuardianLaser(PossessionSession session, Guardian guardian) {")
+
+          path = "src/main/java/dev/onelsey/incarnate/possession/PossessionManager.java"
+          patch(path,
+              "import org.bukkit.entity.Entity;\nimport org.bukkit.entity.EntityType;",
+              "import org.bukkit.entity.Axolotl;\nimport org.bukkit.entity.Entity;\nimport org.bukkit.entity.EntityType;\nimport org.bukkit.entity.Fox;")
+          patch(path,
+              "import org.bukkit.entity.Player;\n",
+              "import org.bukkit.entity.Player;\nimport org.bukkit.util.Vector;\n")
+          patch(path,
+              "            try {\n                controller.tick(session, vessel);\n                session.lastKnownVesselLocation(vessel.getLocation());\n            } catch (Throwable ex) {",
+              "            try {\n                if (bodyStateLocksMovement(vessel)) {\n                    vessel.setVelocity(new Vector());\n                } else {\n                    controller.tick(session, vessel);\n                }\n                session.lastKnownVesselLocation(vessel.getLocation());\n            } catch (Throwable ex) {")
+          patch(path,
+              "    private static void updateVesselTelemetry(PossessionSession session, Mob vessel) {",
+              "    private static boolean bodyStateLocksMovement(Mob vessel) {\n        return vessel instanceof Axolotl axolotl && axolotl.isPlayingDead()\n            || vessel instanceof Fox fox && fox.isSleeping();\n    }\n\n    private static void updateVesselTelemetry(PossessionSession session, Mob vessel) {")
+
+          path = "src/main/java/dev/onelsey/incarnate/config/ConfigMigrator.java"
+          patch(path, "private static final int CURRENT_SCHEMA = 4;", "private static final int CURRENT_SCHEMA = 5;")
+
+          path = "src/main/resources/config.yml"
+          patch(path, "config-version: 4", "config-version: 5")
+          patch(path,
+              "  frog-tongue:\n    enabled: true\n    range: 10.0\n    ray-size: 0.30\n    duration-ticks: 12\n    cooldown-ticks: 24\n\nexcluded-types: []",
+              "  frog-tongue:\n    enabled: true\n    range: 10.0\n    ray-size: 0.30\n    duration-ticks: 12\n    cooldown-ticks: 24\n  axolotl-play-dead:\n    enabled: true\n    cooldown-ticks: 8\n  fox-pounce:\n    enabled: true\n    horizontal-speed: 0.95\n    vertical-velocity: 0.45\n    duration-ticks: 10\n    cooldown-ticks: 24\n    movement-lock-ticks: 6\n  fox-sleep:\n    enabled: true\n    cooldown-ticks: 8\n  panda-roll:\n    enabled: true\n    speed: 0.60\n    vertical-velocity: 0.10\n    duration-ticks: 12\n    cooldown-ticks: 30\n    movement-lock-ticks: 12\n\nexcluded-types: []")
+
+          for path in ("src/main/resources/locales/en_US.yml", "src/main/resources/locales/ru_RU.yml"):
+              pass
+          patch("src/main/resources/locales/en_US.yml",
+              "    frog-melee-tongue: 'melee / Shift+LMB tongue'",
+              "    frog-melee-tongue: 'melee / Shift+LMB tongue'\n    fox-melee-pounce: 'melee / Sprint+LMB pounce'\n    axolotl-play-dead: 'play dead / recover'\n    fox-sleep: 'sleep / wake'\n    panda-roll: 'roll'")
+          patch("src/main/resources/locales/ru_RU.yml",
+              "    frog-melee-tongue: 'удар / Shift+ЛКМ язык'",
+              "    frog-melee-tongue: 'удар / Shift+ЛКМ язык'\n    fox-melee-pounce: 'удар / Sprint+ЛКМ прыжок'\n    axolotl-play-dead: 'притвориться мёртвым / очнуться'\n    fox-sleep: 'уснуть / проснуться'\n    panda-roll: 'кувырок'")
+
+          patch("build.gradle.kts", 'version = "0.7.1"', 'version = "0.8.0"')
+          patch("src/main/resources/plugin.yml", "version: 0.7.1", "version: 0.8.0")
+
+          path = "src/test/java/dev/onelsey/incarnate/config/ConfigMigratorTest.java"
+          p = Path(path)
+          text = p.read_text().replace('defaults.set("config-version", 4);', 'defaults.set("config-version", 5);')
+          text = text.replace('user.set("config-version", 4);', 'user.set("config-version", 5);')
+          text = text.replace('assertEquals(4, user.getInt("config-version"));', 'assertEquals(5, user.getInt("config-version"));')
+          p.write_text(text)
+
+          path = "src/test/java/dev/onelsey/incarnate/message/MessageResourcesTest.java"
+          patch(path, 'assertEquals(4, config.getInt("config-version"));', 'assertEquals(5, config.getInt("config-version"));')
+
+          path = "CHANGELOG.md"
+          p = Path(path)
+          text = p.read_text()
+          heading = "# Changelog\n"
+          entry = """
+## 0.8.0 - Body States & Mobility
+
+- Builds directly on the 0.7.1 Dragon/control and Leaf recovery hotfixes.
+- Adds reversible Axolotl `playingDead` possession state with an `F` toggle and movement suppression while playing dead.
+- Adds Fox body-state capture/recovery for crouching, sleeping, interested, leaping, defending and faceplanted states.
+- Adds Fox `Sprint + LMB` pounce and `F` sleep/wake controls with bounded transient state cleanup.
+- Adds Panda body-state capture/recovery for rolling, sneezing and on-back states plus a controlled native roll action on `F`.
+- Deliberately leaves Panda eating state untouched because its setter has additional vanilla item/state requirements and is not treated as unconditionally reversible.
+- Persists the new reversible body-state snapshots through interrupted-session vessel recovery.
+- Advances additive configuration schema to 5 without replacing existing user values.
+
+"""
+          if "## 0.8.0 - Body States & Mobility" not in text:
+              if heading not in text:
+                  raise SystemExit("missing changelog heading")
+              p.write_text(text.replace(heading, heading + entry, 1))
+
+          path = "README.md"
+          p = Path(path)
+          text = p.read_text()
+          text = text.replace("## What 0.7.0 implements", "## What 0.8.0 implements", 1)
+          anchor = "### Movement families\n"
+          body_section = """### Reversible body states and mobility\n\n0.8.0 expands possession beyond generic movement by preserving more native Mob body state rather than replacing it with synthetic effects.\n\n- Axolotl: `F` toggles the real `playingDead` flag. Controlled movement is suppressed while the body is playing dead.\n- Fox: normal left click remains melee, `Sprint + left click` performs a bounded pounce using the real leaping state and physical velocity, and `F` toggles sleep/wake. Crouching, sleeping, interested, leaping, defending and faceplanted state are captured and restored.\n- Panda: `F` starts a bounded real rolling state with physical motion. Rolling, sneezing and on-back state are captured and restored.\n\nThese states are also written into interrupted-session vessel recovery. Panda eating is intentionally not changed or persisted by Incarnate because the public setter has additional vanilla preconditions; Incarnate avoids claiming exact restoration where it cannot guarantee it.\n\n"""
+          if body_section not in text:
+              if anchor not in text:
+                  raise SystemExit("missing README movement anchor")
+              text = text.replace(anchor, body_section + anchor, 1)
+          p.write_text(text)
+          PY
+          rm .github/workflows/prepare-080.yml
+          git config user.name "Onelsey"
+          git config user.email "103017546+Wandraker@users.noreply.github.com"
+          git add -A
+          git commit -m "Implement Incarnate 0.8.0 body states and mobility"
+          git push origin HEAD:dev/0.8.0-body-states
