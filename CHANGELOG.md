@@ -7,6 +7,8 @@
 - Adds Fox body-state capture/recovery for crouching, sleeping, interested, leaping, defending and faceplanted states.
 - Adds Fox `Sprint + LMB` pounce and `F` sleep/wake controls with bounded transient state cleanup.
 - Adds Panda body-state capture/recovery for rolling, sneezing and on-back states plus a controlled native roll action on `F`.
+- Controlled Axolotl play-dead and Fox sleep states are now session-authoritative while possessed, preventing vanilla state drift from silently desynchronizing movement and ability behavior.
+- Fox pounce and Panda roll reassert their native transient body flags for the bounded action window, so a server tick cannot prematurely erase the visible/native state while Incarnate still considers the action active.
 - Deliberately leaves Panda eating untouched because its setter has additional vanilla state/item preconditions and is not treated as unconditionally reversible.
 - Persists the new reversible body-state snapshots through interrupted-session vessel recovery.
 - Hardens all spectator-target camera/release paths for Paper/Leaf implementations that signal invalid spectator state with either `IllegalStateException` or `IllegalArgumentException`.
