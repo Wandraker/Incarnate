@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "dev.onelsey"
-version = "0.8.1-alpha.4"
+version = "0.9.0-dev.1"
 
 repositories {
     mavenCentral()
