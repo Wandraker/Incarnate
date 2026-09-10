@@ -12,6 +12,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.AbstractSkeleton;
 import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Axolotl;
 import org.bukkit.entity.Blaze;
 import org.bukkit.entity.Breeze;
 import org.bukkit.entity.BreezeWindCharge;
@@ -22,6 +23,7 @@ import org.bukkit.entity.DragonFireball;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Frog;
+import org.bukkit.entity.Fox;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Evoker;
 import org.bukkit.entity.EvokerFangs;
@@ -33,6 +35,7 @@ import org.bukkit.entity.Llama;
 import org.bukkit.entity.LlamaSpit;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Panda;
 import org.bukkit.entity.Piglin;
 import org.bukkit.entity.Pillager;
 import org.bukkit.entity.Player;
@@ -126,6 +129,22 @@ public final class AbilityRegistry {
     private final double frogTongueRaySize;
     private final int frogTongueDurationTicks;
     private final int frogTongueCooldownTicks;
+    private final boolean axolotlPlayDeadEnabled;
+    private final int axolotlPlayDeadCooldownTicks;
+    private final boolean foxPounceEnabled;
+    private final double foxPounceHorizontalSpeed;
+    private final double foxPounceVerticalVelocity;
+    private final int foxPounceDurationTicks;
+    private final int foxPounceCooldownTicks;
+    private final int foxPounceLockTicks;
+    private final boolean foxSleepEnabled;
+    private final int foxSleepCooldownTicks;
+    private final boolean pandaRollEnabled;
+    private final double pandaRollSpeed;
+    private final double pandaRollVerticalVelocity;
+    private final int pandaRollDurationTicks;
+    private final int pandaRollCooldownTicks;
+    private final int pandaRollLockTicks;
 
     public AbilityRegistry(FileConfiguration config) {
         this.skeletonEnabled = config.getBoolean("abilities.skeleton.enabled", true);
@@ -194,6 +213,22 @@ public final class AbilityRegistry {
         this.frogTongueRaySize = Math.max(0.0, config.getDouble("abilities.frog-tongue.ray-size", 0.30));
         this.frogTongueDurationTicks = Math.max(1, config.getInt("abilities.frog-tongue.duration-ticks", 12));
         this.frogTongueCooldownTicks = Math.max(1, config.getInt("abilities.frog-tongue.cooldown-ticks", 24));
+        this.axolotlPlayDeadEnabled = config.getBoolean("abilities.axolotl-play-dead.enabled", true);
+        this.axolotlPlayDeadCooldownTicks = Math.max(1, config.getInt("abilities.axolotl-play-dead.cooldown-ticks", 8));
+        this.foxPounceEnabled = config.getBoolean("abilities.fox-pounce.enabled", true);
+        this.foxPounceHorizontalSpeed = Math.max(0.05, config.getDouble("abilities.fox-pounce.horizontal-speed", 0.95));
+        this.foxPounceVerticalVelocity = Math.max(0.05, config.getDouble("abilities.fox-pounce.vertical-velocity", 0.45));
+        this.foxPounceDurationTicks = Math.max(1, config.getInt("abilities.fox-pounce.duration-ticks", 10));
+        this.foxPounceCooldownTicks = Math.max(1, config.getInt("abilities.fox-pounce.cooldown-ticks", 24));
+        this.foxPounceLockTicks = Math.max(1, config.getInt("abilities.fox-pounce.movement-lock-ticks", 6));
+        this.foxSleepEnabled = config.getBoolean("abilities.fox-sleep.enabled", true);
+        this.foxSleepCooldownTicks = Math.max(1, config.getInt("abilities.fox-sleep.cooldown-ticks", 8));
+        this.pandaRollEnabled = config.getBoolean("abilities.panda-roll.enabled", true);
+        this.pandaRollSpeed = Math.max(0.05, config.getDouble("abilities.panda-roll.speed", 0.60));
+        this.pandaRollVerticalVelocity = Math.max(0.0, config.getDouble("abilities.panda-roll.vertical-velocity", 0.10));
+        this.pandaRollDurationTicks = Math.max(1, config.getInt("abilities.panda-roll.duration-ticks", 12));
+        this.pandaRollCooldownTicks = Math.max(1, config.getInt("abilities.panda-roll.cooldown-ticks", 30));
+        this.pandaRollLockTicks = Math.max(1, config.getInt("abilities.panda-roll.movement-lock-ticks", 12));
     }
 
     public boolean trigger(PossessionSession session, AbilityGesture gesture) {
@@ -201,7 +236,7 @@ public final class AbilityRegistry {
             case PRIMARY -> triggerPrimaryInternal(session);
             case SECONDARY -> triggerSecondaryInternal(session);
             case SNEAK_PRIMARY -> triggerSneakPrimary(session);
-            case SPRINT_PRIMARY -> triggerPrimaryInternal(session);
+            case SPRINT_PRIMARY -> triggerSprintPrimary(session);
         };
     }
 
@@ -219,6 +254,12 @@ public final class AbilityRegistry {
             return false;
         }
 
+        if (vessel instanceof Axolotl axolotl && (session.axolotlPlayingDeadControlled() || axolotl.isPlayingDead())) {
+            return false;
+        }
+        if (vessel instanceof Fox fox && (session.foxSleepingControlled() || fox.isSleeping())) {
+            return false;
+        }
         if (vessel instanceof EnderDragon dragon && dragonFireballEnabled) {
             return shootDragonFireball(session, dragon);
         }
@@ -254,6 +295,15 @@ public final class AbilityRegistry {
             return false;
         }
 
+        if (vessel instanceof Axolotl axolotl && axolotlPlayDeadEnabled) {
+            return toggleAxolotlPlayDead(session, axolotl);
+        }
+        if (vessel instanceof Fox fox && foxSleepEnabled) {
+            return toggleFoxSleep(session, fox);
+        }
+        if (vessel instanceof Panda panda && pandaRollEnabled) {
+            return rollPanda(session, panda);
+        }
         if (vessel instanceof Shulker shulker && shulkerShellEnabled) {
             return toggleShulkerShell(session, shulker);
         }
@@ -281,6 +331,17 @@ public final class AbilityRegistry {
         return false;
     }
 
+    private boolean triggerSprintPrimary(PossessionSession session) {
+        Mob vessel = session.vessel();
+        if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
+            return false;
+        }
+        if (vessel instanceof Fox fox && foxPounceEnabled) {
+            return pounceFox(session, fox);
+        }
+        return triggerPrimaryInternal(session);
+    }
+
     private boolean triggerSneakPrimary(PossessionSession session) {
         Mob vessel = session.vessel();
         if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
@@ -297,6 +358,12 @@ public final class AbilityRegistry {
         if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
             return;
         }
+        if (vessel instanceof Axolotl axolotl) {
+            maintainAxolotlPlayDead(session, axolotl);
+        }
+        if (vessel instanceof Fox fox) {
+            maintainFoxSleep(session, fox);
+        }
         if (vessel instanceof Guardian guardian) {
             tickGuardianLaser(session, guardian);
         }
@@ -308,6 +375,12 @@ public final class AbilityRegistry {
         }
         if (vessel instanceof Frog frog) {
             tickFrogTongue(session, frog);
+        }
+        if (vessel instanceof Fox fox) {
+            tickFoxPounce(session, fox);
+        }
+        if (vessel instanceof Panda panda) {
+            tickPandaRoll(session, panda);
         }
     }
 
@@ -333,12 +406,21 @@ public final class AbilityRegistry {
             frog.setTongueTarget(null);
             session.clearFrogTongue();
         }
+        if (vessel instanceof Fox fox && session.foxPounceTracked()) {
+            fox.setLeaping(false);
+            session.clearFoxPounce();
+        }
+        if (vessel instanceof Panda panda && session.pandaRollTracked()) {
+            panda.setRolling(false);
+            session.clearPandaRoll();
+        }
     }
 
     public String primaryLabel(Mob vessel) {
         if (vessel instanceof EnderDragon && dragonFireballEnabled) return "dragon-fireball";
         if (vessel instanceof Shulker && shulkerBulletEnabled) return "shulker-bullet";
         if (vessel instanceof Frog && frogTongueEnabled) return "frog-melee-tongue";
+        if (vessel instanceof Fox && foxPounceEnabled) return "fox-melee-pounce";
         if (vessel instanceof Guardian && guardianLaserEnabled) return "guardian-laser";
         if (vessel instanceof Creeper && creeperEnabled) return "fuse";
         if (vessel instanceof AbstractSkeleton && skeletonEnabled) return "arrow-melee";
@@ -348,6 +430,9 @@ public final class AbilityRegistry {
     }
 
     public String secondaryLabel(Mob vessel) {
+        if (vessel instanceof Axolotl && axolotlPlayDeadEnabled) return "axolotl-play-dead";
+        if (vessel instanceof Fox && foxSleepEnabled) return "fox-sleep";
+        if (vessel instanceof Panda && pandaRollEnabled) return "panda-roll";
         if (vessel instanceof Shulker && shulkerShellEnabled) return "shulker-shell";
         if (vessel instanceof PufferFish && pufferFishPuffEnabled) return "puff";
         if (vessel instanceof Vex && vexChargeEnabled) return "charge";
@@ -416,6 +501,99 @@ public final class AbilityRegistry {
             || frog.getLocation().distanceSquared(target.getLocation()) > frogTongueRange * frogTongueRange) {
             frog.setTongueTarget(null);
             session.clearFrogTongue();
+        }
+    }
+
+    private boolean toggleAxolotlPlayDead(PossessionSession session, Axolotl axolotl) {
+        if (!session.acquireSecondaryCooldown(axolotlPlayDeadCooldownTicks)) return false;
+        boolean playingDead = !session.axolotlPlayingDeadControlled();
+        axolotl.setPlayingDead(playingDead);
+        session.axolotlPlayingDeadControlled(playingDead);
+        if (playingDead) axolotl.setVelocity(new Vector());
+        return true;
+    }
+
+    private static void maintainAxolotlPlayDead(PossessionSession session, Axolotl axolotl) {
+        boolean expected = session.axolotlPlayingDeadControlled();
+        if (axolotl.isPlayingDead() != expected) {
+            axolotl.setPlayingDead(expected);
+        }
+    }
+
+    private boolean toggleFoxSleep(PossessionSession session, Fox fox) {
+        if (!session.acquireSecondaryCooldown(foxSleepCooldownTicks)) return false;
+        if (session.foxPounceTracked()) { fox.setLeaping(false); session.clearFoxPounce(); }
+        boolean sleeping = !session.foxSleepingControlled();
+        fox.setCrouching(false);
+        fox.setInterested(false);
+        fox.setFaceplanted(false);
+        fox.setSleeping(sleeping);
+        session.foxSleepingControlled(sleeping);
+        if (sleeping) fox.setVelocity(new Vector());
+        return true;
+    }
+
+    private static void maintainFoxSleep(PossessionSession session, Fox fox) {
+        boolean expected = session.foxSleepingControlled();
+        if (fox.isSleeping() != expected) {
+            fox.setSleeping(expected);
+        }
+    }
+
+    private boolean pounceFox(PossessionSession session, Fox fox) {
+        if (session.foxSleepingControlled() || fox.isSleeping() || !fox.isOnGround() || session.foxPounceTracked()) return false;
+        Vector horizontal = direction(session.view());
+        horizontal.setY(0.0);
+        if (horizontal.lengthSquared() < 1.0E-6 || !session.acquirePrimaryCooldown(foxPounceCooldownTicks)) return false;
+        horizontal.normalize().multiply(foxPounceHorizontalSpeed);
+        horizontal.setY(foxPounceVerticalVelocity);
+        fox.setCrouching(false);
+        fox.setInterested(false);
+        fox.setFaceplanted(false);
+        fox.setLeaping(true);
+        session.startFoxPounce(foxPounceDurationTicks);
+        session.lockMovementControl(foxPounceLockTicks);
+        fox.setVelocity(horizontal);
+        return true;
+    }
+
+    private void tickFoxPounce(PossessionSession session, Fox fox) {
+        if (!session.foxPounceTracked()) return;
+        if (session.foxPounceExpired()) {
+            fox.setLeaping(false);
+            session.clearFoxPounce();
+            return;
+        }
+        if (!fox.isLeaping()) {
+            fox.setLeaping(true);
+        }
+    }
+
+    private boolean rollPanda(PossessionSession session, Panda panda) {
+        if (!panda.isOnGround() || session.pandaRollTracked()) return false;
+        Vector horizontal = direction(session.view());
+        horizontal.setY(0.0);
+        if (horizontal.lengthSquared() < 1.0E-6 || !session.acquireSecondaryCooldown(pandaRollCooldownTicks)) return false;
+        horizontal.normalize().multiply(pandaRollSpeed);
+        horizontal.setY(Math.max(panda.getVelocity().getY(), pandaRollVerticalVelocity));
+        panda.setSneezing(false);
+        panda.setOnBack(false);
+        panda.setRolling(true);
+        session.startPandaRoll(pandaRollDurationTicks);
+        session.lockMovementControl(pandaRollLockTicks);
+        panda.setVelocity(horizontal);
+        return true;
+    }
+
+    private void tickPandaRoll(PossessionSession session, Panda panda) {
+        if (!session.pandaRollTracked()) return;
+        if (session.pandaRollExpired()) {
+            panda.setRolling(false);
+            session.clearPandaRoll();
+            return;
+        }
+        if (!panda.isRolling()) {
+            panda.setRolling(true);
         }
     }
 

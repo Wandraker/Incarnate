@@ -5,6 +5,9 @@ import dev.onelsey.incarnate.command.IncarnateCommand;
 import dev.onelsey.incarnate.command.PossessCommand;
 import dev.onelsey.incarnate.command.ReleaseCommand;
 import dev.onelsey.incarnate.config.ConfigMigrator;
+import dev.onelsey.incarnate.input.PrimaryInputDeduplicator;
+import dev.onelsey.incarnate.input.SecondaryInputDeduplicator;
+import dev.onelsey.incarnate.input.SpectatorPrimaryInputBridge;
 import dev.onelsey.incarnate.listener.SessionListener;
 import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
@@ -21,6 +24,7 @@ import java.util.Set;
 public final class IncarnatePlugin extends JavaPlugin {
     private PossessionManager possessions;
     private MessageService messages;
+    private SpectatorPrimaryInputBridge spectatorPrimaryInputBridge;
 
     @Override
     public void onEnable() {
@@ -48,7 +52,24 @@ public final class IncarnatePlugin extends JavaPlugin {
         ));
         Objects.requireNonNull(getCommand("release")).setExecutor(new ReleaseCommand(possessions, messages));
 
-        getServer().getPluginManager().registerEvents(new SessionListener(this, possessions), this);
+        PrimaryInputDeduplicator primaryInputDeduplicator = new PrimaryInputDeduplicator();
+        SecondaryInputDeduplicator secondaryInputDeduplicator = new SecondaryInputDeduplicator();
+        SessionListener sessionListener = new SessionListener(
+            this,
+            possessions,
+            primaryInputDeduplicator,
+            secondaryInputDeduplicator
+        );
+        getServer().getPluginManager().registerEvents(sessionListener, this);
+        spectatorPrimaryInputBridge = new SpectatorPrimaryInputBridge(
+            this,
+            primaryInputDeduplicator,
+            secondaryInputDeduplicator,
+            sessionListener::triggerPrimaryFromPacket,
+            sessionListener::triggerSwapFromPacket
+        );
+        spectatorPrimaryInputBridge.start();
+
         possessions.recoverIndexedVessels();
         possessions.recoverAlreadyOnlinePlayers();
         visibility.recoverStaleTabEntries();
@@ -57,6 +78,9 @@ public final class IncarnatePlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (spectatorPrimaryInputBridge != null) {
+            spectatorPrimaryInputBridge.stop();
+        }
         if (possessions != null) {
             possessions.shutdown();
         }
