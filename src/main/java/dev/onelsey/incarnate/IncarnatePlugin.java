@@ -13,6 +13,7 @@ import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.visibility.PossessionVisibilityManager;
+import dev.onelsey.incarnate.vision.WardenVisionManager;
 import org.bukkit.entity.EntityType;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -25,6 +26,7 @@ public final class IncarnatePlugin extends JavaPlugin {
     private PossessionManager possessions;
     private MessageService messages;
     private SpectatorPrimaryInputBridge spectatorPrimaryInputBridge;
+    private WardenVisionManager wardenVision;
 
     @Override
     public void onEnable() {
@@ -54,11 +56,13 @@ public final class IncarnatePlugin extends JavaPlugin {
 
         PrimaryInputDeduplicator primaryInputDeduplicator = new PrimaryInputDeduplicator();
         SecondaryInputDeduplicator secondaryInputDeduplicator = new SecondaryInputDeduplicator();
+        wardenVision = new WardenVisionManager(this);
         SessionListener sessionListener = new SessionListener(
             this,
             possessions,
             primaryInputDeduplicator,
-            secondaryInputDeduplicator
+            secondaryInputDeduplicator,
+            wardenVision
         );
         getServer().getPluginManager().registerEvents(sessionListener, this);
         spectatorPrimaryInputBridge = new SpectatorPrimaryInputBridge(
@@ -78,6 +82,9 @@ public final class IncarnatePlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (wardenVision != null) {
+            wardenVision.stop();
+        }
         if (spectatorPrimaryInputBridge != null) {
             spectatorPrimaryInputBridge.stop();
         }
