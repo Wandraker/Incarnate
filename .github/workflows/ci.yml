@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - dev/0.9.0-warden-mob-expansion
+    paths:
+      - .github/workflows/ci.yml
+      - .github/scripts/**
 
 permissions:
   contents: write
@@ -34,13 +37,25 @@ jobs:
           python3 .github/scripts/fix_090_config_test.py
       - name: Verify Java 25 build
         run: gradle clean test classes --stacktrace --warning-mode all
-      - name: Commit source changes
+      - name: Commit source changes only
         shell: bash
         run: |
-          git show b8b8869ffd15c2ca8e0d726ac6b98ee2ea212a09:.github/workflows/ci.yml > .github/workflows/ci.yml
-          rm -f .github/scripts/apply_090.py .github/scripts/fix_090_test.py .github/scripts/fix_090_config_test.py
           git config user.name Onelsey
           git config user.email 103017546+Wandraker@users.noreply.github.com
-          git add -A
+          git add build.gradle.kts \
+            src/main/resources/plugin.yml \
+            src/main/resources/config.yml \
+            src/main/java/dev/onelsey/incarnate/config/ConfigMigrator.java \
+            src/main/java/dev/onelsey/incarnate/sense/WardenSenseSnapshot.java \
+            src/main/java/dev/onelsey/incarnate/possession/PossessionSession.java \
+            src/main/java/dev/onelsey/incarnate/possession/PossessionManager.java \
+            src/main/java/dev/onelsey/incarnate/possession/VesselState.java \
+            src/main/java/dev/onelsey/incarnate/possession/VesselRecoveryStore.java \
+            src/main/java/dev/onelsey/incarnate/ability/AbilityRegistry.java \
+            src/main/java/dev/onelsey/incarnate/ability/WardenSonicMath.java \
+            src/test/java/dev/onelsey/incarnate/ability/WardenSonicMathTest.java \
+            src/test/java/dev/onelsey/incarnate/config/ConfigMigratorTest.java \
+            src/test/java/dev/onelsey/incarnate/message/MessageResourcesTest.java \
+            src/test/java/dev/onelsey/incarnate/sense/WardenSenseMathTest.java
           git commit -m "Add Warden sonic control and Ghast attack fidelity"
           git push origin HEAD:dev/0.9.0-warden-mob-expansion
