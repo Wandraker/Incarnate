@@ -4,13 +4,16 @@ import dev.onelsey.incarnate.IncarnatePlugin;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Location;
 import org.bukkit.block.BlockFace;
+import org.bukkit.entity.Axolotl;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Fox;
 import org.bukkit.entity.Frog;
 import org.bukkit.entity.Guardian;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Panda;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Shulker;
@@ -52,6 +55,9 @@ public final class VesselRecoveryStore {
     private final NamespacedKey shulkerPeekKey;
     private final NamespacedKey shulkerAttachedFaceKey;
     private final NamespacedKey snifferStateKey;
+    private final NamespacedKey axolotlPlayingDeadKey;
+    private final NamespacedKey foxBodyStateKey;
+    private final NamespacedKey pandaBodyStateKey;
 
     public VesselRecoveryStore(IncarnatePlugin plugin) {
         this.index = new VesselRecoveryIndex(plugin);
@@ -81,6 +87,9 @@ public final class VesselRecoveryStore {
         this.shulkerPeekKey = new NamespacedKey(plugin, "vessel_recovery_shulker_peek");
         this.shulkerAttachedFaceKey = new NamespacedKey(plugin, "vessel_recovery_shulker_attached_face");
         this.snifferStateKey = new NamespacedKey(plugin, "vessel_recovery_sniffer_state");
+        this.axolotlPlayingDeadKey = new NamespacedKey(plugin, "vessel_recovery_axolotl_playing_dead");
+        this.foxBodyStateKey = new NamespacedKey(plugin, "vessel_recovery_fox_body_state");
+        this.pandaBodyStateKey = new NamespacedKey(plugin, "vessel_recovery_panda_body_state");
     }
 
     public void save(Mob mob, PossessionOrigin origin, VesselState state) {
@@ -151,6 +160,9 @@ public final class VesselRecoveryStore {
             } else {
                 data.remove(snifferStateKey);
             }
+            setNullableBool(data, axolotlPlayingDeadKey, state.axolotlPlayingDead());
+            setNullableInt(data, foxBodyStateKey, state.foxBodyState());
+            setNullableInt(data, pandaBodyStateKey, state.pandaBodyState());
             data.set(activeKey, PersistentDataType.BYTE, (byte) 1);
         } catch (RuntimeException ex) {
             index.forget(vesselId);
@@ -302,6 +314,24 @@ public final class VesselRecoveryStore {
         if (mob instanceof Guardian guardian) {
             guardian.setLaser(false);
         }
+        if (mob instanceof Axolotl axolotl) {
+            Boolean playingDead = readNullableBool(data, axolotlPlayingDeadKey);
+            if (playingDead != null) {
+                axolotl.setPlayingDead(playingDead);
+            }
+        }
+        if (mob instanceof Fox fox) {
+            Integer bodyState = data.get(foxBodyStateKey, PersistentDataType.INTEGER);
+            if (bodyState != null) {
+                BodyStateCodec.restoreFox(fox, bodyState);
+            }
+        }
+        if (mob instanceof Panda panda) {
+            Integer bodyState = data.get(pandaBodyStateKey, PersistentDataType.INTEGER);
+            if (bodyState != null) {
+                BodyStateCodec.restorePanda(panda, bodyState);
+            }
+        }
 
         clear(mob);
         return true;
@@ -336,6 +366,9 @@ public final class VesselRecoveryStore {
         data.remove(shulkerPeekKey);
         data.remove(shulkerAttachedFaceKey);
         data.remove(snifferStateKey);
+        data.remove(axolotlPlayingDeadKey);
+        data.remove(foxBodyStateKey);
+        data.remove(pandaBodyStateKey);
         index.forget(vesselId);
     }
 

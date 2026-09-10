@@ -1,4 +1,4 @@
-config-version: 4
+config-version: 5
 
 control:
   max-possession-distance: 8.0
@@ -187,5 +187,25 @@ abilities:
     ray-size: 0.30
     duration-ticks: 12
     cooldown-ticks: 24
+  axolotl-play-dead:
+    enabled: true
+    cooldown-ticks: 8
+  fox-pounce:
+    enabled: true
+    horizontal-speed: 0.95
+    vertical-velocity: 0.45
+    duration-ticks: 10
+    cooldown-ticks: 24
+    movement-lock-ticks: 6
+  fox-sleep:
+    enabled: true
+    cooldown-ticks: 8
+  panda-roll:
+    enabled: true
+    speed: 0.60
+    vertical-velocity: 0.10
+    duration-ticks: 12
+    cooldown-ticks: 30
+    movement-lock-ticks: 12
 
 excluded-types: []

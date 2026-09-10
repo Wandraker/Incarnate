@@ -3,15 +3,18 @@ package dev.onelsey.incarnate.possession;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.BlockFace;
+import org.bukkit.entity.Axolotl;
 import org.bukkit.entity.Bat;
 import org.bukkit.entity.Camel;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Fox;
 import org.bukkit.entity.Frog;
 import org.bukkit.entity.Guardian;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.Panda;
 import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Ravager;
 import org.bukkit.entity.Shulker;
@@ -46,7 +49,10 @@ public record VesselState(
     Float shulkerPeek,
     BlockFace shulkerAttachedFace,
     Entity frogTongueTarget,
-    Sniffer.State snifferState
+    Sniffer.State snifferState,
+    Boolean axolotlPlayingDead,
+    Integer foxBodyState,
+    Integer pandaBodyState
 ) {
     public static VesselState capture(Mob mob) {
         Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
@@ -68,6 +74,9 @@ public record VesselState(
         BlockFace shulkerAttachedFace = mob instanceof Shulker shulker ? shulker.getAttachedFace() : null;
         Entity frogTongueTarget = mob instanceof Frog frog ? frog.getTongueTarget() : null;
         Sniffer.State snifferState = mob instanceof Sniffer sniffer ? sniffer.getState() : null;
+        Boolean axolotlPlayingDead = mob instanceof Axolotl axolotl ? axolotl.isPlayingDead() : null;
+        Integer foxBodyState = mob instanceof Fox fox ? BodyStateCodec.captureFox(fox) : null;
+        Integer pandaBodyState = mob instanceof Panda panda ? BodyStateCodec.capturePanda(panda) : null;
 
         return new VesselState(
             mob.isAware(),
@@ -95,7 +104,10 @@ public record VesselState(
             shulkerPeek,
             shulkerAttachedFace,
             frogTongueTarget,
-            snifferState
+            snifferState,
+            axolotlPlayingDead,
+            foxBodyState,
+            pandaBodyState
         );
     }
 
@@ -147,6 +159,15 @@ public record VesselState(
         }
         if (mob instanceof Sniffer sniffer) {
             sniffer.setState(Sniffer.State.IDLING);
+        }
+        if (mob instanceof Axolotl axolotl) {
+            axolotl.setPlayingDead(false);
+        }
+        if (mob instanceof Fox fox) {
+            BodyStateCodec.clearFoxForPossession(fox);
+        }
+        if (mob instanceof Panda panda) {
+            BodyStateCodec.clearPandaForPossession(panda);
         }
     }
 
@@ -245,6 +266,15 @@ public record VesselState(
         }
         if (mob instanceof Sniffer sniffer && snifferState != null) {
             sniffer.setState(snifferState);
+        }
+        if (mob instanceof Axolotl axolotl && axolotlPlayingDead != null) {
+            axolotl.setPlayingDead(axolotlPlayingDead);
+        }
+        if (mob instanceof Fox fox && foxBodyState != null) {
+            BodyStateCodec.restoreFox(fox, foxBodyState);
+        }
+        if (mob instanceof Panda panda && pandaBodyState != null) {
+            BodyStateCodec.restorePanda(panda, pandaBodyState);
         }
     }
 
