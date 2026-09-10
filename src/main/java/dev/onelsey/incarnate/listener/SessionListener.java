@@ -166,7 +166,7 @@ public final class SessionListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
-        triggerPrimaryGesture(event.getPlayer());
+        triggerPrimaryFromTransport(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -178,10 +178,10 @@ public final class SessionListener implements Listener {
         if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) {
             return;
         }
-        triggerPrimaryGesture(event.getPlayer());
+        triggerPrimaryFromTransport(event.getPlayer());
     }
 
-    private void triggerPrimaryGesture(Player player) {
+    public void triggerPrimaryFromTransport(Player player) {
         PossessionSession session = possessions.session(player);
         if (session != null && session.isActive()) {
             possessions.triggerGesture(player, primaryGesture(player, session));
