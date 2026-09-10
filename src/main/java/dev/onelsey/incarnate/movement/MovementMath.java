@@ -53,6 +53,21 @@ final class MovementMath {
         );
     }
 
+    static float dragonBodyYaw(float controllerYaw) {
+        return wrapDegrees(controllerYaw + 180.0f);
+    }
+
+    static float wrapDegrees(float degrees) {
+        float wrapped = degrees % 360.0f;
+        if (wrapped >= 180.0f) {
+            wrapped -= 360.0f;
+        }
+        if (wrapped < -180.0f) {
+            wrapped += 360.0f;
+        }
+        return wrapped;
+    }
+
     static float clampPitch(float pitch) {
         return Math.max(-90.0f, Math.min(90.0f, pitch));
     }

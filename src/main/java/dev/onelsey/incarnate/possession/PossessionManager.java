@@ -384,11 +384,28 @@ public final class PossessionManager {
             }
 
             session.cameraTransport(CameraTransport.MOUNTED);
+            if (session.vesselType() == EntityType.ENDER_DRAGON) {
+                resyncMountedDragonView(session);
+            }
             sendAcquiredMessage(session, "mounted-free-look");
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
         if (mountTask == null && session.isActive()) {
             requestRelease(session, ReleaseReason.VESSEL_REMOVED);
         }
+    }
+
+    private void resyncMountedDragonView(PossessionSession session) {
+        Player player = session.player();
+        ViewSnapshot view = session.view();
+        player.setRotation(view.yaw(), view.pitch());
+
+        player.getScheduler().runDelayed(plugin, task -> {
+            if (!session.isActive() || !player.isOnline() || !session.usesMountedCamera()) {
+                return;
+            }
+            ViewSnapshot currentView = session.view();
+            player.setRotation(currentView.yaw(), currentView.pitch());
+        }, null, 1L);
     }
 
     private void retryMountedCamera(PossessionSession session, int attempt) {
