@@ -5,6 +5,8 @@ import com.destroystokyo.paper.event.player.PlayerStopSpectatingEntityEvent;
 import dev.onelsey.incarnate.IncarnatePlugin;
 import dev.onelsey.incarnate.ability.AbilityGesture;
 import dev.onelsey.incarnate.input.InputSnapshot;
+import dev.onelsey.incarnate.input.PrimaryInputDeduplicator;
+import dev.onelsey.incarnate.input.PrimaryInputTransport;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionSession;
 import dev.onelsey.incarnate.possession.ReleaseReason;
@@ -40,14 +42,20 @@ import java.util.concurrent.TimeUnit;
 
 public final class SessionListener implements Listener {
     private final PossessionManager possessions;
+    private final PrimaryInputDeduplicator primaryInputDeduplicator;
     private final boolean releaseHotkey;
     private final boolean secondaryHotkey;
     private final boolean sneakPrimaryGesture;
     private final boolean sprintPrimaryGesture;
     private final long spectatorShiftLatchNanos;
 
-    public SessionListener(IncarnatePlugin plugin, PossessionManager possessions) {
+    public SessionListener(
+        IncarnatePlugin plugin,
+        PossessionManager possessions,
+        PrimaryInputDeduplicator primaryInputDeduplicator
+    ) {
         this.possessions = possessions;
+        this.primaryInputDeduplicator = primaryInputDeduplicator;
         this.releaseHotkey = plugin.getConfig().getBoolean("release-key.shift-swap-offhand", true);
         this.secondaryHotkey = plugin.getConfig().getBoolean("secondary-key.swap-offhand", true);
         this.sneakPrimaryGesture = plugin.getConfig().getBoolean("input.gestures.sneak-primary", true);
@@ -129,12 +137,12 @@ public final class SessionListener implements Listener {
         }
         if (session.usesMountedCamera()) {
             event.setCancelled(true);
-            possessions.triggerGesture(event.getPlayer(), primaryGesture(event.getPlayer(), session));
+            triggerPrimaryFromTransport(event.getPlayer(), PrimaryInputTransport.SPECTATE_ENTITY);
             return;
         }
         if (!event.getNewSpectatorTarget().getUniqueId().equals(session.vesselId())) {
             event.setCancelled(true);
-            possessions.triggerGesture(event.getPlayer(), primaryGesture(event.getPlayer(), session));
+            triggerPrimaryFromTransport(event.getPlayer(), PrimaryInputTransport.SPECTATE_ENTITY);
         }
     }
 
@@ -166,7 +174,7 @@ public final class SessionListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
-        triggerPrimaryFromTransport(event.getPlayer());
+        triggerPrimaryFromTransport(event.getPlayer(), PrimaryInputTransport.ARM_SWING);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -178,14 +186,22 @@ public final class SessionListener implements Listener {
         if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) {
             return;
         }
-        triggerPrimaryFromTransport(event.getPlayer());
+        triggerPrimaryFromTransport(event.getPlayer(), PrimaryInputTransport.INTERACT);
     }
 
-    public void triggerPrimaryFromTransport(Player player) {
+    public void triggerPrimaryFromPacket(Player player) {
+        triggerPrimaryFromTransport(player, PrimaryInputTransport.SPECTATOR_PACKET);
+    }
+
+    private void triggerPrimaryFromTransport(Player player, PrimaryInputTransport transport) {
         PossessionSession session = possessions.session(player);
-        if (session != null && session.isActive()) {
-            possessions.triggerGesture(player, primaryGesture(player, session));
+        if (session == null || !session.isActive()) {
+            return;
         }
+        if (!primaryInputDeduplicator.accept(player.getUniqueId(), transport, System.nanoTime())) {
+            return;
+        }
+        possessions.triggerGesture(player, primaryGesture(player, session));
     }
 
     private AbilityGesture primaryGesture(Player player, PossessionSession session) {
@@ -278,6 +294,7 @@ public final class SessionListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        primaryInputDeduplicator.clear(event.getPlayer().getUniqueId());
         possessions.releaseOnQuit(event.getPlayer());
     }
 
