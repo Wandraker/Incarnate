@@ -27,12 +27,18 @@ public final class SpectatorPrimaryInputBridge implements Listener {
     private static final String VANILLA_PACKET_HANDLER = "packet_handler";
 
     private final IncarnatePlugin plugin;
+    private final PrimaryInputDeduplicator deduplicator;
     private final Consumer<Player> primaryInput;
     private final Map<UUID, Channel> channels = new ConcurrentHashMap<>();
     private final AtomicBoolean warnedUnavailable = new AtomicBoolean(false);
 
-    public SpectatorPrimaryInputBridge(IncarnatePlugin plugin, Consumer<Player> primaryInput) {
+    public SpectatorPrimaryInputBridge(
+        IncarnatePlugin plugin,
+        PrimaryInputDeduplicator deduplicator,
+        Consumer<Player> primaryInput
+    ) {
         this.plugin = plugin;
+        this.deduplicator = deduplicator;
         this.primaryInput = primaryInput;
     }
 
@@ -57,10 +63,12 @@ public final class SpectatorPrimaryInputBridge implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        Channel channel = channels.remove(event.getPlayer().getUniqueId());
+        UUID playerId = event.getPlayer().getUniqueId();
+        Channel channel = channels.remove(playerId);
         if (channel != null) {
             removeHandler(channel);
         }
+        deduplicator.clear(playerId);
     }
 
     private void scheduleInjection(Player player, int attempt) {
@@ -95,6 +103,7 @@ public final class SpectatorPrimaryInputBridge implements Listener {
                         public void channelRead(ChannelHandlerContext context, Object message) throws Exception {
                             try {
                                 if (isSpectatorPrimaryAction(message)) {
+                                    deduplicator.markSpectatorPacket(player.getUniqueId(), System.nanoTime());
                                     dispatchPrimary(player);
                                 }
                             } catch (Throwable ex) {
