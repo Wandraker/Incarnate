@@ -1,61 +1,168 @@
-name: Apply Incarnate 0.9 development patch
+name: Java 25 CI
 
 on:
   push:
-    branches:
-      - dev/0.9.0-warden-mob-expansion
-    paths:
-      - .github/workflows/ci.yml
-      - .github/scripts/**
+    branches: [ main, dev/0.9.0-warden-mob-expansion ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: incarnate-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  apply:
+  compile:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 12
+
       - name: Set up Java 25
         uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '25'
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.6.1'
-      - name: Apply source patch
-        shell: bash
-        run: |
-          python3 .github/scripts/apply_090.py
-          python3 .github/scripts/fix_090_test.py
-          python3 .github/scripts/fix_090_config_test.py
-      - name: Verify Java 25 build
+
+      - name: Unit test and compile against Paper 26.2
         run: gradle clean test classes --stacktrace --warning-mode all
-      - name: Commit source changes only
+
+  paper-smoke:
+    needs: compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.1'
+
+      - name: Resolve plugin version
+        id: plugin-meta
         shell: bash
         run: |
-          git config user.name Onelsey
-          git config user.email 103017546+Wandraker@users.noreply.github.com
-          git add build.gradle.kts \
-            src/main/resources/plugin.yml \
-            src/main/resources/config.yml \
-            src/main/java/dev/onelsey/incarnate/config/ConfigMigrator.java \
-            src/main/java/dev/onelsey/incarnate/sense/WardenSenseSnapshot.java \
-            src/main/java/dev/onelsey/incarnate/possession/PossessionSession.java \
-            src/main/java/dev/onelsey/incarnate/possession/PossessionManager.java \
-            src/main/java/dev/onelsey/incarnate/possession/VesselState.java \
-            src/main/java/dev/onelsey/incarnate/possession/VesselRecoveryStore.java \
-            src/main/java/dev/onelsey/incarnate/ability/AbilityRegistry.java \
-            src/main/java/dev/onelsey/incarnate/ability/WardenSonicMath.java \
-            src/test/java/dev/onelsey/incarnate/ability/WardenSonicMathTest.java \
-            src/test/java/dev/onelsey/incarnate/config/ConfigMigratorTest.java \
-            src/test/java/dev/onelsey/incarnate/message/MessageResourcesTest.java \
-            src/test/java/dev/onelsey/incarnate/sense/WardenSenseMathTest.java
-          git commit -m "Add Warden sonic control and Ghast attack fidelity"
-          git push origin HEAD:dev/0.9.0-warden-mob-expansion
+          set -euo pipefail
+          VERSION=$(sed -n 's/^version: //p' src/main/resources/plugin.yml | head -n1 | tr -d "'\"")
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build plugin jar
+        run: gradle clean jar --stacktrace --warning-mode all
+
+      - name: Download Paper 26.2 build 121
+        shell: bash
+        run: |
+          set -euo pipefail
+          USER_AGENT='Incarnate-CI (GitHub Actions)'
+          BUILDS=$(curl -fsSL -H "User-Agent: ${USER_AGENT}" 'https://fill.papermc.io/v3/projects/paper/versions/26.2/builds')
+          PAPER_URL=$(printf '%s' "$BUILDS" | jq -r 'first(.[] | select(.id == 121) | .downloads."server:default".url) // empty')
+          test -n "$PAPER_URL"
+          curl -fsSL -H "User-Agent: ${USER_AGENT}" -o paper.jar "$PAPER_URL"
+
+      - name: Verify Paper startup and shutdown lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLUGIN_VERSION='${{ steps.plugin-meta.outputs.version }}'
+          PLUGIN_JAR="build/libs/Incarnate-${PLUGIN_VERSION}.jar"
+          test -f "$PLUGIN_JAR"
+
+          mkdir -p ci-server/plugins
+          cp "$PLUGIN_JAR" ci-server/plugins/Incarnate.jar
+          cp paper.jar ci-server/paper.jar
+          printf 'eula=true\n' > ci-server/eula.txt
+          mkfifo ci-server/server-input
+          exec 3<>ci-server/server-input
+
+          cd ci-server
+          java -Xms768M -Xmx1536M -jar paper.jar --nogui < server-input > ../paper-smoke.log 2>&1 &
+          SERVER_PID=$!
+          cd ..
+
+          cleanup() {
+            exec 3>&- 2>/dev/null || true
+            if kill -0 "$SERVER_PID" 2>/dev/null; then
+              kill -TERM "$SERVER_PID" 2>/dev/null || true
+              sleep 2
+            fi
+            if kill -0 "$SERVER_PID" 2>/dev/null; then
+              kill -KILL "$SERVER_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for _ in $(seq 1 100); do
+            if grep -Eq 'Done \([^)]*\)! For help, type "help"' paper-smoke.log 2>/dev/null \
+              && grep -Fq "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log 2>/dev/null; then
+              READY=1
+              break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo 'Paper exited before startup completed.'
+              cat paper-smoke.log || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$READY" -ne 1 ]; then
+            echo 'Timed out waiting for Paper and Incarnate startup.'
+            cat paper-smoke.log || true
+            exit 1
+          fi
+
+          printf 'stop\n' >&3
+          exec 3>&-
+
+          STOPPED=0
+          for _ in $(seq 1 45); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              STOPPED=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$STOPPED" -ne 1 ]; then
+            echo 'Paper did not stop cleanly after the stop command.'
+            cat paper-smoke.log || true
+            exit 1
+          fi
+
+          wait "$SERVER_PID" || true
+          trap - EXIT
+          cat paper-smoke.log
+
+          grep -F "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log
+          grep -F "Disabling Incarnate v${PLUGIN_VERSION}" paper-smoke.log
+
+          if grep -E 'Error occurred while enabling Incarnate|Error occurred while disabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate|IllegalPluginAccessException' paper-smoke.log; then
+            exit 1
+          fi
+
+      - name: Upload validated Incarnate JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: Incarnate-${{ steps.plugin-meta.outputs.version }}
+          path: build/libs/Incarnate-${{ steps.plugin-meta.outputs.version }}.jar
+          if-no-files-found: error
+          retention-days: 30
