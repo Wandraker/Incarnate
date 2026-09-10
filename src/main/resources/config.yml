@@ -1,4 +1,4 @@
-config-version: 5
+config-version: 6
 
 control:
   max-possession-distance: 8.0
@@ -36,6 +36,15 @@ senses:
     memory-ticks: 40
     ignore-self: true
     show-event-kind: true
+
+vision:
+  warden:
+    enabled: true
+    entity-hard-limit: 12.0
+    evaluation-interval-ticks: 2
+    watch-prune-distance: 256.0
+    visual-darkness: true
+    visual-refresh-ticks: 100
 
 admin:
   inspect-distance: 12.0
