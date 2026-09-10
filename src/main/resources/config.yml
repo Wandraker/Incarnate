@@ -1,4 +1,4 @@
-config-version: 6
+config-version: 7
 
 control:
   max-possession-distance: 8.0
@@ -216,5 +216,19 @@ abilities:
     duration-ticks: 12
     cooldown-ticks: 30
     movement-lock-ticks: 12
+  warden-sonic:
+    enabled: true
+    range: 20.0
+    damage: 10.0
+    horizontal-knockback: 2.5
+    vertical-knockback: 0.5
+    particle-step: 0.5
+    charge-ticks: 34
+    cooldown-ticks: 80
+  ghast-fireball:
+    enabled: true
+    speed: 1.0
+    charge-ticks: 20
+    cooldown-ticks: 60
 
 excluded-types: []

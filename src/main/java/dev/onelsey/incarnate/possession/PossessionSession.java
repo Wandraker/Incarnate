@@ -53,6 +53,9 @@ public final class PossessionSession {
     private volatile long frogTongueUntilTick = Long.MIN_VALUE;
     private volatile long foxPounceUntilTick = Long.MIN_VALUE;
     private volatile long pandaRollUntilTick = Long.MIN_VALUE;
+    private volatile UUID wardenSonicTargetId;
+    private volatile long wardenSonicFireTick = Long.MIN_VALUE;
+    private volatile long ghastFireballFireTick = Long.MIN_VALUE;
     private volatile boolean axolotlPlayingDeadControlled;
     private volatile boolean foxSleepingControlled;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
@@ -118,9 +121,9 @@ public final class PossessionSession {
 
     public VesselPositionSnapshot vesselPosition() { return vesselPosition; }
 
-    public void recordWardenSense(UUID worldId, double x, double y, double z, String kind, String eventKey, int memoryTicks) {
+    public void recordWardenSense(UUID worldId, double x, double y, double z, String kind, String eventKey, UUID sourceId, int memoryTicks) {
         long expires = controlTick + Math.max(1, memoryTicks);
-        this.wardenSense = new WardenSenseSnapshot(worldId, x, y, z, kind, eventKey, expires);
+        this.wardenSense = new WardenSenseSnapshot(worldId, x, y, z, kind, eventKey, sourceId, expires);
     }
 
     public WardenSenseSnapshot activeWardenSense() {
@@ -296,6 +299,24 @@ public final class PossessionSession {
     public boolean pandaRollTracked() { return pandaRollUntilTick != Long.MIN_VALUE; }
     public boolean pandaRollExpired() { return pandaRollTracked() && controlTick > pandaRollUntilTick; }
     public void clearPandaRoll() { pandaRollUntilTick = Long.MIN_VALUE; }
+
+    public void startWardenSonic(UUID targetId, int chargeTicks) {
+        wardenSonicTargetId = targetId;
+        wardenSonicFireTick = controlTick + Math.max(1, chargeTicks);
+    }
+
+    public boolean wardenSonicTracked() { return wardenSonicFireTick != Long.MIN_VALUE && wardenSonicTargetId != null; }
+    public boolean wardenSonicReady() { return wardenSonicTracked() && controlTick >= wardenSonicFireTick; }
+    public UUID wardenSonicTargetId() { return wardenSonicTargetId; }
+    public void clearWardenSonic() {
+        wardenSonicTargetId = null;
+        wardenSonicFireTick = Long.MIN_VALUE;
+    }
+
+    public void startGhastFireball(int chargeTicks) { ghastFireballFireTick = controlTick + Math.max(1, chargeTicks); }
+    public boolean ghastFireballTracked() { return ghastFireballFireTick != Long.MIN_VALUE; }
+    public boolean ghastFireballReady() { return ghastFireballTracked() && controlTick >= ghastFireballFireTick; }
+    public void clearGhastFireball() { ghastFireballFireTick = Long.MIN_VALUE; }
 
     public boolean axolotlPlayingDeadControlled() { return axolotlPlayingDeadControlled; }
     public void axolotlPlayingDeadControlled(boolean value) { axolotlPlayingDeadControlled = value; }

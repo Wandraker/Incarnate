@@ -12,6 +12,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Fox;
 import org.bukkit.entity.Frog;
 import org.bukkit.entity.Guardian;
+import org.bukkit.entity.Ghast;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Panda;
@@ -34,6 +35,7 @@ public record VesselState(
     Boolean sitting,
     Boolean camelDashing,
     Boolean batAwake,
+    Boolean ghastCharging,
     Boolean creeperIgnited,
     Integer creeperFuseTicks,
     Boolean guardianLaserActive,
@@ -58,6 +60,7 @@ public record VesselState(
         Boolean sitting = mob instanceof Sittable sittable ? sittable.isSitting() : null;
         Boolean camelDashing = mob instanceof Camel camel ? camel.isDashing() : null;
         Boolean batAwake = mob instanceof Bat bat ? bat.isAwake() : null;
+        Boolean ghastCharging = mob instanceof Ghast ghast ? ghast.isCharging() : null;
         Boolean creeperIgnited = mob instanceof Creeper creeper ? creeper.isIgnited() : null;
         Integer creeperFuseTicks = mob instanceof Creeper creeper ? creeper.getFuseTicks() : null;
         Boolean guardianLaserActive = mob instanceof Guardian guardian ? guardian.hasLaser() : null;
@@ -89,6 +92,7 @@ public record VesselState(
             sitting,
             camelDashing,
             batAwake,
+            ghastCharging,
             creeperIgnited,
             creeperFuseTicks,
             guardianLaserActive,
@@ -130,6 +134,9 @@ public record VesselState(
         if (mob instanceof Bat bat) {
             bat.setAwake(true);
             bat.setTargetLocation(null);
+        }
+        if (mob instanceof Ghast ghast) {
+            ghast.setCharging(false);
         }
         if (mob instanceof Guardian guardian) {
             guardian.setLaser(false);
@@ -213,6 +220,9 @@ public record VesselState(
         if (mob instanceof Bat bat && batAwake != null) {
             bat.setAwake(batAwake);
             bat.setTargetLocation(null);
+        }
+        if (mob instanceof Ghast ghast && ghastCharging != null) {
+            ghast.setCharging(ghastCharging);
         }
         if (mob instanceof Creeper creeper && creeperIgnited != null && creeperFuseTicks != null) {
             restoreCreeper(creeper, creeperIgnited, creeperFuseTicks);

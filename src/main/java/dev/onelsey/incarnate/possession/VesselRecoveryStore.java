@@ -12,6 +12,7 @@ import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Fox;
 import org.bukkit.entity.Frog;
 import org.bukkit.entity.Guardian;
+import org.bukkit.entity.Ghast;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Panda;
 import org.bukkit.entity.PufferFish;
@@ -40,6 +41,7 @@ public final class VesselRecoveryStore {
     private final NamespacedKey sittingKey;
     private final NamespacedKey camelDashingKey;
     private final NamespacedKey batAwakeKey;
+    private final NamespacedKey ghastChargingKey;
     private final NamespacedKey creeperIgnitedKey;
     private final NamespacedKey creeperFuseTicksKey;
     private final NamespacedKey pufferFishPuffStateKey;
@@ -72,6 +74,7 @@ public final class VesselRecoveryStore {
         this.sittingKey = new NamespacedKey(plugin, "vessel_recovery_sitting");
         this.camelDashingKey = new NamespacedKey(plugin, "vessel_recovery_camel_dashing");
         this.batAwakeKey = new NamespacedKey(plugin, "vessel_recovery_bat_awake");
+        this.ghastChargingKey = new NamespacedKey(plugin, "vessel_recovery_ghast_charging");
         this.creeperIgnitedKey = new NamespacedKey(plugin, "vessel_recovery_creeper_ignited");
         this.creeperFuseTicksKey = new NamespacedKey(plugin, "vessel_recovery_creeper_fuse_ticks");
         this.pufferFishPuffStateKey = new NamespacedKey(plugin, "vessel_recovery_pufferfish_puff_state");
@@ -111,6 +114,7 @@ public final class VesselRecoveryStore {
             setNullableBool(data, sittingKey, state.sitting());
             setNullableBool(data, camelDashingKey, state.camelDashing());
             setNullableBool(data, batAwakeKey, state.batAwake());
+            setNullableBool(data, ghastChargingKey, state.ghastCharging());
             setNullableBool(data, creeperIgnitedKey, state.creeperIgnited());
             if (state.creeperFuseTicks() != null) {
                 data.set(creeperFuseTicksKey, PersistentDataType.INTEGER, state.creeperFuseTicks());
@@ -223,6 +227,12 @@ public final class VesselRecoveryStore {
             if (awake != null) {
                 bat.setAwake(awake);
                 bat.setTargetLocation(null);
+            }
+        }
+        if (mob instanceof Ghast ghast) {
+            Boolean charging = readNullableBool(data, ghastChargingKey);
+            if (charging != null) {
+                ghast.setCharging(charging);
             }
         }
         if (mob instanceof Creeper creeper) {
@@ -351,6 +361,7 @@ public final class VesselRecoveryStore {
         data.remove(sittingKey);
         data.remove(camelDashingKey);
         data.remove(batAwakeKey);
+        data.remove(ghastChargingKey);
         data.remove(creeperIgnitedKey);
         data.remove(creeperFuseTicksKey);
         data.remove(pufferFishPuffStateKey);

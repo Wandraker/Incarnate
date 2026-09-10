@@ -33,7 +33,7 @@ final class WardenSenseMathTest {
     @Test
     void senseSnapshotExpiresOnControlTicks() {
         WardenSenseSnapshot snapshot = new WardenSenseSnapshot(
-            UUID.randomUUID(), 1.0, 2.0, 3.0, "movement", "step", 42L
+            UUID.randomUUID(), 1.0, 2.0, 3.0, "movement", "step", null, 42L
         );
         assertTrue(snapshot.isActive(42L));
         assertFalse(snapshot.isActive(43L));

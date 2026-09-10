@@ -9,6 +9,7 @@ public record WardenSenseSnapshot(
     double z,
     String kind,
     String eventKey,
+    UUID sourceId,
     long expiresAfterTick
 ) {
     public boolean isActive(long controlTick) {

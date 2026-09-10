@@ -677,7 +677,7 @@ public final class PossessionManager {
             if (position.distanceSquared(x, y, z) > rangeSquared) {
                 continue;
             }
-            session.recordWardenSense(worldId, x, y, z, kind, eventKey, wardenSenseMemoryTicks);
+            session.recordWardenSense(worldId, x, y, z, kind, eventKey, sourceId, wardenSenseMemoryTicks);
         }
     }
 

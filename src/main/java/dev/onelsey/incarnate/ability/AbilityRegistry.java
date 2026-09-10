@@ -7,6 +7,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -52,6 +59,7 @@ import org.bukkit.entity.Spellcaster;
 import org.bukkit.entity.TraderLlama;
 import org.bukkit.entity.Vex;
 import org.bukkit.entity.Witch;
+import org.bukkit.entity.Warden;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.WitherSkull;
 import org.bukkit.inventory.EntityEquipment;
@@ -61,6 +69,7 @@ import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public final class AbilityRegistry {
     private final boolean skeletonEnabled;
@@ -145,6 +154,18 @@ public final class AbilityRegistry {
     private final int pandaRollDurationTicks;
     private final int pandaRollCooldownTicks;
     private final int pandaRollLockTicks;
+    private final boolean wardenSonicEnabled;
+    private final double wardenSonicRange;
+    private final double wardenSonicDamage;
+    private final double wardenSonicHorizontalKnockback;
+    private final double wardenSonicVerticalKnockback;
+    private final double wardenSonicParticleStep;
+    private final int wardenSonicChargeTicks;
+    private final int wardenSonicCooldownTicks;
+    private final boolean ghastFireballEnabled;
+    private final double ghastFireballSpeed;
+    private final int ghastFireballChargeTicks;
+    private final int ghastFireballCooldownTicks;
 
     public AbilityRegistry(FileConfiguration config) {
         this.skeletonEnabled = config.getBoolean("abilities.skeleton.enabled", true);
@@ -229,6 +250,18 @@ public final class AbilityRegistry {
         this.pandaRollDurationTicks = Math.max(1, config.getInt("abilities.panda-roll.duration-ticks", 12));
         this.pandaRollCooldownTicks = Math.max(1, config.getInt("abilities.panda-roll.cooldown-ticks", 30));
         this.pandaRollLockTicks = Math.max(1, config.getInt("abilities.panda-roll.movement-lock-ticks", 12));
+        this.wardenSonicEnabled = config.getBoolean("abilities.warden-sonic.enabled", true);
+        this.wardenSonicRange = Math.max(2.0, config.getDouble("abilities.warden-sonic.range", 20.0));
+        this.wardenSonicDamage = Math.max(0.0, config.getDouble("abilities.warden-sonic.damage", 10.0));
+        this.wardenSonicHorizontalKnockback = Math.max(0.0, config.getDouble("abilities.warden-sonic.horizontal-knockback", 2.5));
+        this.wardenSonicVerticalKnockback = Math.max(0.0, config.getDouble("abilities.warden-sonic.vertical-knockback", 0.5));
+        this.wardenSonicParticleStep = Math.max(0.25, config.getDouble("abilities.warden-sonic.particle-step", 0.5));
+        this.wardenSonicChargeTicks = Math.max(1, config.getInt("abilities.warden-sonic.charge-ticks", 34));
+        this.wardenSonicCooldownTicks = Math.max(1, config.getInt("abilities.warden-sonic.cooldown-ticks", 80));
+        this.ghastFireballEnabled = config.getBoolean("abilities.ghast-fireball.enabled", true);
+        this.ghastFireballSpeed = Math.max(0.1, config.getDouble("abilities.ghast-fireball.speed", 1.0));
+        this.ghastFireballChargeTicks = Math.max(1, config.getInt("abilities.ghast-fireball.charge-ticks", 20));
+        this.ghastFireballCooldownTicks = Math.max(1, config.getInt("abilities.ghast-fireball.cooldown-ticks", 60));
     }
 
     public boolean trigger(PossessionSession session, AbilityGesture gesture) {
@@ -272,6 +305,9 @@ public final class AbilityRegistry {
         if (vessel instanceof Creeper creeper && creeperEnabled) {
             return toggleCreeper(session, creeper);
         }
+        if (vessel instanceof Ghast ghast && ghastFireballEnabled) {
+            return startGhastFireball(session, ghast);
+        }
         if (vessel instanceof AbstractSkeleton skeleton && skeletonEnabled) {
             if (!skeletonRequireBow || hasBow(skeleton)) {
                 return shootSkeleton(session, skeleton);
@@ -303,6 +339,9 @@ public final class AbilityRegistry {
         }
         if (vessel instanceof Panda panda && pandaRollEnabled) {
             return rollPanda(session, panda);
+        }
+        if (vessel instanceof Warden warden && wardenSonicEnabled) {
+            return startWardenSonic(session, warden);
         }
         if (vessel instanceof Shulker shulker && shulkerShellEnabled) {
             return toggleShulkerShell(session, shulker);
@@ -382,6 +421,12 @@ public final class AbilityRegistry {
         if (vessel instanceof Panda panda) {
             tickPandaRoll(session, panda);
         }
+        if (vessel instanceof Warden warden) {
+            tickWardenSonic(session, warden);
+        }
+        if (vessel instanceof Ghast ghast) {
+            tickGhastFireball(session, ghast);
+        }
     }
 
     public void abortActive(PossessionSession session) {
@@ -414,6 +459,13 @@ public final class AbilityRegistry {
             panda.setRolling(false);
             session.clearPandaRoll();
         }
+        if (vessel instanceof Warden && session.wardenSonicTracked()) {
+            session.clearWardenSonic();
+        }
+        if (vessel instanceof Ghast ghast && session.ghastFireballTracked()) {
+            ghast.setCharging(false);
+            session.clearGhastFireball();
+        }
     }
 
     public String primaryLabel(Mob vessel) {
@@ -423,6 +475,7 @@ public final class AbilityRegistry {
         if (vessel instanceof Fox && foxPounceEnabled) return "fox-melee-pounce";
         if (vessel instanceof Guardian && guardianLaserEnabled) return "guardian-laser";
         if (vessel instanceof Creeper && creeperEnabled) return "fuse";
+        if (vessel instanceof Ghast && ghastFireballEnabled) return "ghast-fireball";
         if (vessel instanceof AbstractSkeleton && skeletonEnabled) return "arrow-melee";
         if (nativeProjectilesEnabled && projectileFor(vessel) != null) return "projectile";
         if (nativeRangedEnabled && vessel instanceof RangedEntity && supportsNativeRanged(vessel)) return "ranged-melee";
@@ -433,6 +486,7 @@ public final class AbilityRegistry {
         if (vessel instanceof Axolotl && axolotlPlayDeadEnabled) return "axolotl-play-dead";
         if (vessel instanceof Fox && foxSleepEnabled) return "fox-sleep";
         if (vessel instanceof Panda && pandaRollEnabled) return "panda-roll";
+        if (vessel instanceof Warden && wardenSonicEnabled) return "sonic-boom";
         if (vessel instanceof Shulker && shulkerShellEnabled) return "shulker-shell";
         if (vessel instanceof PufferFish && pufferFishPuffEnabled) return "puff";
         if (vessel instanceof Vex && vexChargeEnabled) return "charge";
@@ -442,6 +496,154 @@ public final class AbilityRegistry {
         if (vessel instanceof Camel && camelDashEnabled) return "dash";
         if (vessel instanceof Ravager && ravagerRoarEnabled) return "roar";
         return "none";
+    }
+
+    private boolean startWardenSonic(PossessionSession session, Warden warden) {
+        if (session.wardenSonicTracked()) {
+            return false;
+        }
+        var sense = session.activeWardenSense();
+        if (sense == null || sense.sourceId() == null) {
+            return false;
+        }
+
+        Entity rawTarget = Bukkit.getEntity(sense.sourceId());
+        if (!(rawTarget instanceof LivingEntity target)
+            || !Bukkit.isOwnedByCurrentRegion(target)
+            || !target.isValid()
+            || target.isDead()
+            || target.getUniqueId().equals(session.playerId())
+            || target.getUniqueId().equals(session.vesselId())
+            || target.getWorld() != warden.getWorld()
+            || warden.getEyeLocation().distanceSquared(target.getEyeLocation()) > wardenSonicRange * wardenSonicRange
+            || !session.acquireSecondaryCooldown(Math.max(wardenSonicCooldownTicks, wardenSonicChargeTicks))) {
+            return false;
+        }
+
+        session.startWardenSonic(target.getUniqueId(), wardenSonicChargeTicks);
+        session.lockMovementControl(wardenSonicChargeTicks + 2);
+        warden.setVelocity(new Vector());
+        warden.getWorld().playSound(
+            warden.getLocation(),
+            Sound.ENTITY_WARDEN_SONIC_CHARGE,
+            SoundCategory.HOSTILE,
+            3.0f,
+            1.0f
+        );
+        return true;
+    }
+
+    private void tickWardenSonic(PossessionSession session, Warden warden) {
+        if (!session.wardenSonicTracked()) {
+            return;
+        }
+
+        UUID targetId = session.wardenSonicTargetId();
+        Entity rawTarget = targetId == null ? null : Bukkit.getEntity(targetId);
+        if (!(rawTarget instanceof LivingEntity target)
+            || !Bukkit.isOwnedByCurrentRegion(target)
+            || !target.isValid()
+            || target.isDead()
+            || target.getWorld() != warden.getWorld()
+            || warden.getEyeLocation().distanceSquared(target.getEyeLocation()) > wardenSonicRange * wardenSonicRange) {
+            session.clearWardenSonic();
+            return;
+        }
+        if (!session.wardenSonicReady()) {
+            warden.setVelocity(new Vector());
+            return;
+        }
+
+        emitWardenSonic(warden, target);
+        session.clearWardenSonic();
+    }
+
+    private void emitWardenSonic(Warden warden, LivingEntity target) {
+        Location start = warden.getEyeLocation();
+        Location end = target.getEyeLocation();
+        Vector delta = end.toVector().subtract(start.toVector());
+        double distance = delta.length();
+        if (distance < 1.0E-6) {
+            return;
+        }
+
+        Vector normalized = delta.clone().multiply(1.0 / distance);
+        for (double travel = 1.0; travel < distance; travel += wardenSonicParticleStep) {
+            Location point = start.clone().add(normalized.clone().multiply(travel));
+            if (!Bukkit.isOwnedByCurrentRegion(point)) {
+                break;
+            }
+            warden.getWorld().spawnParticle(Particle.SONIC_BOOM, point, 1);
+        }
+        warden.getWorld().playSound(
+            warden.getLocation(),
+            Sound.ENTITY_WARDEN_SONIC_BOOM,
+            SoundCategory.HOSTILE,
+            3.0f,
+            1.0f
+        );
+
+        DamageSource source = DamageSource.builder(DamageType.SONIC_BOOM)
+            .withCausingEntity(warden)
+            .withDirectEntity(warden)
+            .build();
+        target.damage(wardenSonicDamage, source);
+
+        AttributeInstance resistanceAttribute = target.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        double resistance = resistanceAttribute == null ? 0.0 : resistanceAttribute.getValue();
+        double scale = WardenSonicMath.resistanceScale(resistance);
+        Vector knockback = new Vector(
+            normalized.getX() * wardenSonicHorizontalKnockback * scale,
+            normalized.getY() * wardenSonicVerticalKnockback * scale,
+            normalized.getZ() * wardenSonicHorizontalKnockback * scale
+        );
+        target.setVelocity(target.getVelocity().add(knockback));
+    }
+
+    private boolean startGhastFireball(PossessionSession session, Ghast ghast) {
+        if (session.ghastFireballTracked()
+            || !session.acquirePrimaryCooldown(Math.max(ghastFireballCooldownTicks, ghastFireballChargeTicks))) {
+            return false;
+        }
+
+        ghast.setCharging(true);
+        ghast.setVelocity(new Vector());
+        session.startGhastFireball(ghastFireballChargeTicks);
+        session.lockMovementControl(ghastFireballChargeTicks);
+        ghast.getWorld().playSound(
+            ghast.getLocation(),
+            Sound.ENTITY_GHAST_WARN,
+            SoundCategory.HOSTILE,
+            10.0f,
+            1.0f
+        );
+        return true;
+    }
+
+    private void tickGhastFireball(PossessionSession session, Ghast ghast) {
+        if (!session.ghastFireballTracked()) {
+            return;
+        }
+        if (!ghast.isCharging()) {
+            ghast.setCharging(true);
+        }
+        if (!session.ghastFireballReady()) {
+            ghast.setVelocity(new Vector());
+            return;
+        }
+
+        Vector velocity = direction(session.view()).multiply(ghastFireballSpeed);
+        LargeFireball fireball = ghast.launchProjectile(LargeFireball.class, velocity);
+        fireball.setYield(ghast.getExplosionPower());
+        ghast.getWorld().playSound(
+            ghast.getLocation(),
+            Sound.ENTITY_GHAST_SHOOT,
+            SoundCategory.HOSTILE,
+            10.0f,
+            1.0f
+        );
+        ghast.setCharging(false);
+        session.clearGhastFireball();
     }
 
     private boolean shootDragonFireball(PossessionSession session, EnderDragon dragon) {
@@ -1009,9 +1211,6 @@ public final class AbilityRegistry {
     private static Class<? extends Projectile> projectileFor(Mob vessel) {
         if (vessel instanceof Blaze) {
             return SmallFireball.class;
-        }
-        if (vessel instanceof Ghast) {
-            return LargeFireball.class;
         }
         if (vessel instanceof Wither) {
             return WitherSkull.class;
