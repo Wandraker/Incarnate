@@ -7,6 +7,8 @@ import dev.onelsey.incarnate.ability.AbilityGesture;
 import dev.onelsey.incarnate.input.InputSnapshot;
 import dev.onelsey.incarnate.input.PrimaryInputDeduplicator;
 import dev.onelsey.incarnate.input.PrimaryInputTransport;
+import dev.onelsey.incarnate.input.SecondaryInputDeduplicator;
+import dev.onelsey.incarnate.input.SecondaryInputTransport;
 import dev.onelsey.incarnate.possession.PossessionManager;
 import dev.onelsey.incarnate.possession.PossessionSession;
 import dev.onelsey.incarnate.possession.ReleaseReason;
@@ -43,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 public final class SessionListener implements Listener {
     private final PossessionManager possessions;
     private final PrimaryInputDeduplicator primaryInputDeduplicator;
+    private final SecondaryInputDeduplicator secondaryInputDeduplicator;
     private final boolean releaseHotkey;
     private final boolean secondaryHotkey;
     private final boolean sneakPrimaryGesture;
@@ -52,10 +55,12 @@ public final class SessionListener implements Listener {
     public SessionListener(
         IncarnatePlugin plugin,
         PossessionManager possessions,
-        PrimaryInputDeduplicator primaryInputDeduplicator
+        PrimaryInputDeduplicator primaryInputDeduplicator,
+        SecondaryInputDeduplicator secondaryInputDeduplicator
     ) {
         this.possessions = possessions;
         this.primaryInputDeduplicator = primaryInputDeduplicator;
+        this.secondaryInputDeduplicator = secondaryInputDeduplicator;
         this.releaseHotkey = plugin.getConfig().getBoolean("release-key.shift-swap-offhand", true);
         this.secondaryHotkey = plugin.getConfig().getBoolean("secondary-key.swap-offhand", true);
         this.sneakPrimaryGesture = plugin.getConfig().getBoolean("input.gestures.sneak-primary", true);
@@ -152,20 +157,34 @@ public final class SessionListener implements Listener {
         if (session == null || !session.isActive()) {
             return;
         }
+        event.setCancelled(true);
+        triggerSwapFromTransport(event.getPlayer(), SecondaryInputTransport.BUKKIT_SWAP);
+    }
+
+    public void triggerSwapFromPacket(Player player) {
+        triggerSwapFromTransport(player, SecondaryInputTransport.PLAYER_ACTION_PACKET);
+    }
+
+    private void triggerSwapFromTransport(Player player, SecondaryInputTransport transport) {
+        PossessionSession session = possessions.session(player);
+        if (session == null || !session.isActive()) {
+            return;
+        }
+        if (!secondaryInputDeduplicator.accept(player.getUniqueId(), transport, System.nanoTime())) {
+            return;
+        }
 
         boolean sneak = session.input().sneak()
-            || event.getPlayer().isSneaking()
+            || player.isSneaking()
             || session.hasRecentSpectatorShiftAttempt(spectatorShiftLatchNanos);
 
         if (releaseHotkey && sneak) {
-            event.setCancelled(true);
             possessions.requestRelease(session, ReleaseReason.HOTKEY);
             return;
         }
 
         if (secondaryHotkey) {
-            event.setCancelled(true);
-            possessions.triggerSecondary(event.getPlayer());
+            possessions.triggerSecondary(player);
         }
     }
 
@@ -295,6 +314,7 @@ public final class SessionListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         primaryInputDeduplicator.clear(event.getPlayer().getUniqueId());
+        secondaryInputDeduplicator.clear(event.getPlayer().getUniqueId());
         possessions.releaseOnQuit(event.getPlayer());
     }
 

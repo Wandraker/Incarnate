@@ -23,6 +23,20 @@ class SpectatorPrimaryInputBridgeTest {
     }
 
     @Test
+    void detectsSwapOffhandPlayerAction() {
+        assertTrue(SpectatorPrimaryInputBridge.isSwapOffhandAction(
+            new ServerboundPlayerActionPacket(PlayerAction.SWAP_ITEM_WITH_OFFHAND)
+        ));
+    }
+
+    @Test
+    void ignoresOtherPlayerActions() {
+        assertFalse(SpectatorPrimaryInputBridge.isSwapOffhandAction(
+            new ServerboundPlayerActionPacket(PlayerAction.DROP_ITEM)
+        ));
+    }
+
+    @Test
     void ignoresUnrelatedPackets() {
         assertFalse(SpectatorPrimaryInputBridge.isSpectatorPrimaryAction(new Object()));
     }
@@ -32,6 +46,19 @@ class SpectatorPrimaryInputBridgeTest {
 
         private ServerboundSpectatorActionPacket(OptionalInt entityId) {
             this.entityId = entityId;
+        }
+    }
+
+    private enum PlayerAction {
+        SWAP_ITEM_WITH_OFFHAND,
+        DROP_ITEM
+    }
+
+    private static final class ServerboundPlayerActionPacket {
+        private final PlayerAction action;
+
+        private ServerboundPlayerActionPacket(PlayerAction action) {
+            this.action = action;
         }
     }
 }

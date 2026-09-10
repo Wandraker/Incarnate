@@ -24,22 +24,30 @@ import java.util.function.Consumer;
 public final class SpectatorPrimaryInputBridge implements Listener {
     private static final String HANDLER_NAME = "incarnate_spectator_primary";
     private static final String PACKET_SIMPLE_NAME = "ServerboundSpectatorActionPacket";
+    private static final String PLAYER_ACTION_PACKET_SIMPLE_NAME = "ServerboundPlayerActionPacket";
+    private static final String SWAP_OFFHAND_ACTION = "SWAP_ITEM_WITH_OFFHAND";
     private static final String VANILLA_PACKET_HANDLER = "packet_handler";
 
     private final IncarnatePlugin plugin;
     private final PrimaryInputDeduplicator deduplicator;
+    private final SecondaryInputDeduplicator secondaryInputDeduplicator;
     private final Consumer<Player> primaryInput;
+    private final Consumer<Player> secondaryInput;
     private final Map<UUID, Channel> channels = new ConcurrentHashMap<>();
     private final AtomicBoolean warnedUnavailable = new AtomicBoolean(false);
 
     public SpectatorPrimaryInputBridge(
         IncarnatePlugin plugin,
         PrimaryInputDeduplicator deduplicator,
-        Consumer<Player> primaryInput
+        SecondaryInputDeduplicator secondaryInputDeduplicator,
+        Consumer<Player> primaryInput,
+        Consumer<Player> secondaryInput
     ) {
         this.plugin = plugin;
         this.deduplicator = deduplicator;
+        this.secondaryInputDeduplicator = secondaryInputDeduplicator;
         this.primaryInput = primaryInput;
+        this.secondaryInput = secondaryInput;
     }
 
     public void start() {
@@ -69,6 +77,7 @@ public final class SpectatorPrimaryInputBridge implements Listener {
             removeHandler(channel);
         }
         deduplicator.clear(playerId);
+        secondaryInputDeduplicator.clear(playerId);
     }
 
     private void scheduleInjection(Player player, int attempt) {
@@ -102,9 +111,13 @@ public final class SpectatorPrimaryInputBridge implements Listener {
                         @Override
                         public void channelRead(ChannelHandlerContext context, Object message) throws Exception {
                             try {
+                                long nowNanos = System.nanoTime();
                                 if (isSpectatorPrimaryAction(message)) {
-                                    deduplicator.markSpectatorPacket(player.getUniqueId(), System.nanoTime());
+                                    deduplicator.markSpectatorPacket(player.getUniqueId(), nowNanos);
                                     dispatchPrimary(player);
+                                } else if (isSwapOffhandAction(message)) {
+                                    secondaryInputDeduplicator.markPacket(player.getUniqueId(), nowNanos);
+                                    dispatchSecondary(player);
                                 }
                             } catch (Throwable ex) {
                                 warnUnavailable("spectator primary packet decoding failed", ex);
@@ -140,6 +153,14 @@ public final class SpectatorPrimaryInputBridge implements Listener {
         }, null);
     }
 
+    private void dispatchSecondary(Player player) {
+        player.getScheduler().run(plugin, task -> {
+            if (player.isOnline()) {
+                secondaryInput.accept(player);
+            }
+        }, null);
+    }
+
     private static Channel resolveChannel(Player player) throws ReflectiveOperationException {
         Method getHandle = player.getClass().getMethod("getHandle");
         Object serverPlayer = getHandle.invoke(player);
@@ -168,6 +189,27 @@ public final class SpectatorPrimaryInputBridge implements Listener {
 
     static boolean isSpectatorPrimaryAction(Object packet) {
         return packet != null && PACKET_SIMPLE_NAME.equals(packet.getClass().getSimpleName());
+    }
+
+    static boolean isSwapOffhandAction(Object packet) {
+        if (packet == null || !PLAYER_ACTION_PACKET_SIMPLE_NAME.equals(packet.getClass().getSimpleName())) {
+            return false;
+        }
+        for (Class<?> type = packet.getClass(); type != null; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (!field.getType().isEnum() || !field.trySetAccessible()) {
+                    continue;
+                }
+                try {
+                    Object value = field.get(packet);
+                    if (value instanceof Enum<?> action && SWAP_OFFHAND_ACTION.equals(action.name())) {
+                        return true;
+                    }
+                } catch (IllegalAccessException ignored) {
+                }
+            }
+        }
+        return false;
     }
 
     private void removeHandler(Channel channel) {

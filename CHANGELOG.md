@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.1-alpha.4 - Spectator Secondary Input
+
+- Restores the swap-offhand (`F`) input path while the hidden possession controller is in spectator mode.
+- Observes `ServerboundPlayerActionPacket` with `SWAP_ITEM_WITH_OFFHAND` before vanilla spectator handling and hands the pulse back to the Player EntityScheduler.
+- Keeps `F` as the configured secondary action and preserves `Shift + F` as the emergency release gesture; no control remapping is introduced.
+- Adds packet/Bukkit deduplication so one physical `F` press cannot execute a secondary ability twice on forks that also emit `PlayerSwapHandItemsEvent`.
+- Keeps the Bukkit swap event as a compatibility fallback and continues cancelling the hidden controller inventory swap during an active possession.
+- Adds regression coverage for swap-offhand packet recognition, unrelated player-action rejection, deduplication and fallback behavior.
+- Retains the live-confirmed 0.8.1-alpha.2 LMB transport fix and 0.8.1-alpha.3 primary-input deduplication.
+
 ## 0.8.1-alpha.2 - Spectator Primary Input
 
 - Fixes the Minecraft 26.2 no-target left-click path used while the hidden possession controller is in spectator mode.

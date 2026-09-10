@@ -6,6 +6,7 @@ import dev.onelsey.incarnate.command.PossessCommand;
 import dev.onelsey.incarnate.command.ReleaseCommand;
 import dev.onelsey.incarnate.config.ConfigMigrator;
 import dev.onelsey.incarnate.input.PrimaryInputDeduplicator;
+import dev.onelsey.incarnate.input.SecondaryInputDeduplicator;
 import dev.onelsey.incarnate.input.SpectatorPrimaryInputBridge;
 import dev.onelsey.incarnate.listener.SessionListener;
 import dev.onelsey.incarnate.message.MessageService;
@@ -52,12 +53,20 @@ public final class IncarnatePlugin extends JavaPlugin {
         Objects.requireNonNull(getCommand("release")).setExecutor(new ReleaseCommand(possessions, messages));
 
         PrimaryInputDeduplicator primaryInputDeduplicator = new PrimaryInputDeduplicator();
-        SessionListener sessionListener = new SessionListener(this, possessions, primaryInputDeduplicator);
+        SecondaryInputDeduplicator secondaryInputDeduplicator = new SecondaryInputDeduplicator();
+        SessionListener sessionListener = new SessionListener(
+            this,
+            possessions,
+            primaryInputDeduplicator,
+            secondaryInputDeduplicator
+        );
         getServer().getPluginManager().registerEvents(sessionListener, this);
         spectatorPrimaryInputBridge = new SpectatorPrimaryInputBridge(
             this,
             primaryInputDeduplicator,
-            sessionListener::triggerPrimaryFromPacket
+            secondaryInputDeduplicator,
+            sessionListener::triggerPrimaryFromPacket,
+            sessionListener::triggerSwapFromPacket
         );
         spectatorPrimaryInputBridge.start();
 
