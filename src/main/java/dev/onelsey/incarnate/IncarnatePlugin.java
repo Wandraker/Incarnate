@@ -5,6 +5,7 @@ import dev.onelsey.incarnate.command.IncarnateCommand;
 import dev.onelsey.incarnate.command.PossessCommand;
 import dev.onelsey.incarnate.command.ReleaseCommand;
 import dev.onelsey.incarnate.config.ConfigMigrator;
+import dev.onelsey.incarnate.input.SpectatorPrimaryInputBridge;
 import dev.onelsey.incarnate.listener.SessionListener;
 import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
@@ -21,6 +22,7 @@ import java.util.Set;
 public final class IncarnatePlugin extends JavaPlugin {
     private PossessionManager possessions;
     private MessageService messages;
+    private SpectatorPrimaryInputBridge spectatorPrimaryInputBridge;
 
     @Override
     public void onEnable() {
@@ -48,7 +50,11 @@ public final class IncarnatePlugin extends JavaPlugin {
         ));
         Objects.requireNonNull(getCommand("release")).setExecutor(new ReleaseCommand(possessions, messages));
 
-        getServer().getPluginManager().registerEvents(new SessionListener(this, possessions), this);
+        SessionListener sessionListener = new SessionListener(this, possessions);
+        getServer().getPluginManager().registerEvents(sessionListener, this);
+        spectatorPrimaryInputBridge = new SpectatorPrimaryInputBridge(this, sessionListener::triggerPrimaryFromTransport);
+        spectatorPrimaryInputBridge.start();
+
         possessions.recoverIndexedVessels();
         possessions.recoverAlreadyOnlinePlayers();
         visibility.recoverStaleTabEntries();
@@ -57,6 +63,9 @@ public final class IncarnatePlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (spectatorPrimaryInputBridge != null) {
+            spectatorPrimaryInputBridge.stop();
+        }
         if (possessions != null) {
             possessions.shutdown();
         }
