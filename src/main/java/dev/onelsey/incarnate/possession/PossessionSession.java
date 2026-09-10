@@ -53,6 +53,8 @@ public final class PossessionSession {
     private volatile long frogTongueUntilTick = Long.MIN_VALUE;
     private volatile long foxPounceUntilTick = Long.MIN_VALUE;
     private volatile long pandaRollUntilTick = Long.MIN_VALUE;
+    private volatile boolean axolotlPlayingDeadControlled;
+    private volatile boolean foxSleepingControlled;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
     private volatile CameraTransport cameraTransport = CameraTransport.NONE;
     private volatile boolean cameraTeleportInProgress;
@@ -294,6 +296,11 @@ public final class PossessionSession {
     public boolean pandaRollTracked() { return pandaRollUntilTick != Long.MIN_VALUE; }
     public boolean pandaRollExpired() { return pandaRollTracked() && controlTick > pandaRollUntilTick; }
     public void clearPandaRoll() { pandaRollUntilTick = Long.MIN_VALUE; }
+
+    public boolean axolotlPlayingDeadControlled() { return axolotlPlayingDeadControlled; }
+    public void axolotlPlayingDeadControlled(boolean value) { axolotlPlayingDeadControlled = value; }
+    public boolean foxSleepingControlled() { return foxSleepingControlled; }
+    public void foxSleepingControlled(boolean value) { foxSleepingControlled = value; }
 
     public void markSpectatorShiftAttempt() {
         this.lastSpectatorShiftAttemptNanos = System.nanoTime();

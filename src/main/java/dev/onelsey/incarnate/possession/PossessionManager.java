@@ -591,7 +591,7 @@ public final class PossessionManager {
             session.advanceControlTick();
             updateVesselTelemetry(session, vessel);
             try {
-                if (bodyStateLocksMovement(vessel)) {
+                if (bodyStateLocksMovement(session, vessel)) {
                     vessel.setVelocity(new Vector());
                 } else {
                     controller.tick(session, vessel);
@@ -621,9 +621,9 @@ public final class PossessionManager {
         }
     }
 
-    private static boolean bodyStateLocksMovement(Mob vessel) {
-        return vessel instanceof Axolotl axolotl && axolotl.isPlayingDead()
-            || vessel instanceof Fox fox && fox.isSleeping();
+    private static boolean bodyStateLocksMovement(PossessionSession session, Mob vessel) {
+        return vessel instanceof Axolotl axolotl && (session.axolotlPlayingDeadControlled() || axolotl.isPlayingDead())
+            || vessel instanceof Fox fox && (session.foxSleepingControlled() || fox.isSleeping());
     }
 
     private static void updateVesselTelemetry(PossessionSession session, Mob vessel) {

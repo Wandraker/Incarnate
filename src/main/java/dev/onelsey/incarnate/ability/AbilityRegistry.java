@@ -254,10 +254,10 @@ public final class AbilityRegistry {
             return false;
         }
 
-        if (vessel instanceof Axolotl axolotl && axolotl.isPlayingDead()) {
+        if (vessel instanceof Axolotl axolotl && (session.axolotlPlayingDeadControlled() || axolotl.isPlayingDead())) {
             return false;
         }
-        if (vessel instanceof Fox fox && fox.isSleeping()) {
+        if (vessel instanceof Fox fox && (session.foxSleepingControlled() || fox.isSleeping())) {
             return false;
         }
         if (vessel instanceof EnderDragon dragon && dragonFireballEnabled) {
@@ -357,6 +357,12 @@ public final class AbilityRegistry {
         Mob vessel = session.vessel();
         if (!session.isActive() || !vessel.isValid() || vessel.isDead()) {
             return;
+        }
+        if (vessel instanceof Axolotl axolotl) {
+            maintainAxolotlPlayDead(session, axolotl);
+        }
+        if (vessel instanceof Fox fox) {
+            maintainFoxSleep(session, fox);
         }
         if (vessel instanceof Guardian guardian) {
             tickGuardianLaser(session, guardian);
@@ -500,26 +506,42 @@ public final class AbilityRegistry {
 
     private boolean toggleAxolotlPlayDead(PossessionSession session, Axolotl axolotl) {
         if (!session.acquireSecondaryCooldown(axolotlPlayDeadCooldownTicks)) return false;
-        boolean playingDead = !axolotl.isPlayingDead();
+        boolean playingDead = !session.axolotlPlayingDeadControlled();
         axolotl.setPlayingDead(playingDead);
+        session.axolotlPlayingDeadControlled(playingDead);
         if (playingDead) axolotl.setVelocity(new Vector());
         return true;
+    }
+
+    private static void maintainAxolotlPlayDead(PossessionSession session, Axolotl axolotl) {
+        boolean expected = session.axolotlPlayingDeadControlled();
+        if (axolotl.isPlayingDead() != expected) {
+            axolotl.setPlayingDead(expected);
+        }
     }
 
     private boolean toggleFoxSleep(PossessionSession session, Fox fox) {
         if (!session.acquireSecondaryCooldown(foxSleepCooldownTicks)) return false;
         if (session.foxPounceTracked()) { fox.setLeaping(false); session.clearFoxPounce(); }
-        boolean sleeping = !fox.isSleeping();
+        boolean sleeping = !session.foxSleepingControlled();
         fox.setCrouching(false);
         fox.setInterested(false);
         fox.setFaceplanted(false);
         fox.setSleeping(sleeping);
+        session.foxSleepingControlled(sleeping);
         if (sleeping) fox.setVelocity(new Vector());
         return true;
     }
 
+    private static void maintainFoxSleep(PossessionSession session, Fox fox) {
+        boolean expected = session.foxSleepingControlled();
+        if (fox.isSleeping() != expected) {
+            fox.setSleeping(expected);
+        }
+    }
+
     private boolean pounceFox(PossessionSession session, Fox fox) {
-        if (fox.isSleeping() || !fox.isOnGround() || session.foxPounceTracked()) return false;
+        if (session.foxSleepingControlled() || fox.isSleeping() || !fox.isOnGround() || session.foxPounceTracked()) return false;
         Vector horizontal = direction(session.view());
         horizontal.setY(0.0);
         if (horizontal.lengthSquared() < 1.0E-6 || !session.acquirePrimaryCooldown(foxPounceCooldownTicks)) return false;
@@ -536,9 +558,14 @@ public final class AbilityRegistry {
     }
 
     private void tickFoxPounce(PossessionSession session, Fox fox) {
-        if (session.foxPounceTracked() && session.foxPounceExpired()) {
+        if (!session.foxPounceTracked()) return;
+        if (session.foxPounceExpired()) {
             fox.setLeaping(false);
             session.clearFoxPounce();
+            return;
+        }
+        if (!fox.isLeaping()) {
+            fox.setLeaping(true);
         }
     }
 
@@ -559,9 +586,14 @@ public final class AbilityRegistry {
     }
 
     private void tickPandaRoll(PossessionSession session, Panda panda) {
-        if (session.pandaRollTracked() && session.pandaRollExpired()) {
+        if (!session.pandaRollTracked()) return;
+        if (session.pandaRollExpired()) {
             panda.setRolling(false);
             session.clearPandaRoll();
+            return;
+        }
+        if (!panda.isRolling()) {
+            panda.setRolling(true);
         }
     }
 
