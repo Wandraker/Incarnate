@@ -25,6 +25,7 @@ public final class WardenVisionManager {
     private final int evaluationIntervalTicks;
     private final boolean visualDarkness;
     private final int visualRefreshTicks;
+    private final int visualEffectDurationTicks;
     private final Map<UUID, VisionState> states = new ConcurrentHashMap<>();
 
     public WardenVisionManager(IncarnatePlugin plugin) {
@@ -35,6 +36,7 @@ public final class WardenVisionManager {
         this.evaluationIntervalTicks = Math.max(1, plugin.getConfig().getInt("vision.warden.evaluation-interval-ticks", 2));
         this.visualDarkness = plugin.getConfig().getBoolean("vision.warden.visual-darkness", true);
         this.visualRefreshTicks = Math.max(20, plugin.getConfig().getInt("vision.warden.visual-refresh-ticks", 100));
+        this.visualEffectDurationTicks = Math.max(40, visualRefreshTicks + 40);
     }
 
     public void ensureActive(PossessionSession session) {
@@ -315,7 +317,7 @@ public final class WardenVisionManager {
     private void applyVisualDarkness(Player player) {
         PotionEffect effect = new PotionEffect(
             PotionEffectType.DARKNESS,
-            PotionEffect.INFINITE_DURATION,
+            visualEffectDurationTicks,
             0,
             false,
             false,
