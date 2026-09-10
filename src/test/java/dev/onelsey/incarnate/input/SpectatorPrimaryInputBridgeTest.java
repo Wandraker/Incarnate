@@ -10,21 +10,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SpectatorPrimaryInputBridgeTest {
     @Test
     void detectsNoTargetSpectatorAction() {
-        assertTrue(SpectatorPrimaryInputBridge.isNoTargetSpectatorAction(
+        assertTrue(SpectatorPrimaryInputBridge.isSpectatorPrimaryAction(
             new ServerboundSpectatorActionPacket(OptionalInt.empty())
         ));
     }
 
     @Test
-    void ignoresSpectatorActionWithEntityTarget() {
-        assertFalse(SpectatorPrimaryInputBridge.isNoTargetSpectatorAction(
+    void detectsEntityTargetedSpectatorAction() {
+        assertTrue(SpectatorPrimaryInputBridge.isSpectatorPrimaryAction(
             new ServerboundSpectatorActionPacket(OptionalInt.of(42))
         ));
     }
 
     @Test
     void ignoresUnrelatedPackets() {
-        assertFalse(SpectatorPrimaryInputBridge.isNoTargetSpectatorAction(new Object()));
+        assertFalse(SpectatorPrimaryInputBridge.isSpectatorPrimaryAction(new Object()));
     }
 
     private static final class ServerboundSpectatorActionPacket {
