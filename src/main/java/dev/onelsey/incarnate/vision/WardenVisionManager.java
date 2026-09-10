@@ -90,6 +90,9 @@ public final class WardenVisionManager {
         }
 
         TargetState target = state.targets.computeIfAbsent(entity.getUniqueId(), ignored -> new TargetState(entity));
+        if (target.retired.get()) {
+            return true;
+        }
         startWatcher(state, target);
 
         boolean hidden = initialHidden(session, entity);
@@ -175,9 +178,13 @@ public final class WardenVisionManager {
         PossessionSession session = state.session;
         Entity entity = target.entity;
         ScheduledTask watcher = entity.getScheduler().runAtFixedRate(plugin, task -> {
-            if (states.get(session.playerId()) != state || !session.isActive() || !entity.isValid()) {
+            if (states.get(session.playerId()) != state || !session.isActive()) {
                 task.cancel();
-                removeTarget(state, target, false);
+                return;
+            }
+            if (!entity.isValid()) {
+                task.cancel();
+                retireTarget(state, target);
                 return;
             }
 
@@ -196,15 +203,10 @@ public final class WardenVisionManager {
             boolean hidden = WardenVisionMath.shouldHide(sameWorld, dx, dy, dz, entityHardLimit);
             updateDesired(state, target, hidden);
 
-            if (hidden && sameWorld && WardenVisionMath.withinRadius(dx, dy, dz, pruneDistance)) {
-                return;
-            }
             if (hidden && (!sameWorld || !WardenVisionMath.withinRadius(dx, dy, dz, pruneDistance))) {
-                target.desiredHidden.set(false);
-                queueVisibilityUpdate(state, target);
-                removeTarget(state, target, true);
+                retireTarget(state, target);
             }
-        }, () -> removeTarget(state, target, false), 1L, evaluationIntervalTicks);
+        }, () -> retireTarget(state, target), 1L, evaluationIntervalTicks);
         target.watcherTask = watcher;
         if (watcher == null) {
             target.watcherStarted.set(false);
@@ -212,9 +214,28 @@ public final class WardenVisionManager {
     }
 
     private void updateDesired(VisionState state, TargetState target, boolean hidden) {
+        if (target.retired.get()) {
+            return;
+        }
         boolean previous = target.desiredHidden.getAndSet(hidden);
         if (previous != hidden || target.appliedHidden.get() != hidden) {
             queueVisibilityUpdate(state, target);
+        }
+    }
+
+    private void retireTarget(VisionState state, TargetState target) {
+        if (!target.retired.compareAndSet(false, true)) {
+            return;
+        }
+        target.desiredHidden.set(false);
+        ScheduledTask watcher = target.watcherTask;
+        if (watcher != null) {
+            watcher.cancel();
+        }
+        if (target.appliedHidden.get()) {
+            queueVisibilityUpdate(state, target);
+        } else {
+            removeTarget(state, target, false);
         }
     }
 
@@ -240,6 +261,10 @@ public final class WardenVisionManager {
                 }
             } finally {
                 target.updateQueued.set(false);
+                if (target.retired.get() && !target.appliedHidden.get()) {
+                    removeTarget(state, target, false);
+                    return;
+                }
                 if (states.get(state.session.playerId()) == state
                     && target.desiredHidden.get() != target.appliedHidden.get()) {
                     queueVisibilityUpdate(state, target);
@@ -352,6 +377,7 @@ public final class WardenVisionManager {
         private final AtomicBoolean desiredHidden = new AtomicBoolean(false);
         private final AtomicBoolean appliedHidden = new AtomicBoolean(false);
         private final AtomicBoolean updateQueued = new AtomicBoolean(false);
+        private final AtomicBoolean retired = new AtomicBoolean(false);
         private volatile ScheduledTask watcherTask;
 
         private TargetState(Entity entity) {
