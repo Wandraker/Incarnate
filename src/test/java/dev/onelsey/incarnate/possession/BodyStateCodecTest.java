@@ -2,6 +2,7 @@ package dev.onelsey.incarnate.possession;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,5 +24,11 @@ final class BodyStateCodecTest {
         assertTrue(BodyStateCodec.has(mask, BodyStateCodec.PANDA_ROLLING));
         assertFalse(BodyStateCodec.has(mask, BodyStateCodec.PANDA_SNEEZING));
         assertTrue(BodyStateCodec.has(mask, BodyStateCodec.PANDA_ON_BACK));
+    }
+
+    @Test
+    void emptyBodyStatesEncodeAsZero() {
+        assertEquals(0, BodyStateCodec.packFox(false, false, false, false, false, false));
+        assertEquals(0, BodyStateCodec.packPanda(false, false, false));
     }
 }
