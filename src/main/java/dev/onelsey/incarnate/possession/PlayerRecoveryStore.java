@@ -125,9 +125,11 @@ public final class PlayerRecoveryStore {
             }
         }
 
-        try {
-            player.setSpectatorTarget(null);
-        } catch (IllegalStateException ignored) {
+        if (player.getGameMode() == GameMode.SPECTATOR) {
+            try {
+                player.setSpectatorTarget(null);
+            } catch (IllegalStateException | IllegalArgumentException ignored) {
+            }
         }
 
         GameMode mode = GameMode.SURVIVAL;
