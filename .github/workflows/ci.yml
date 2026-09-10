@@ -2,25 +2,20 @@ name: Java 25 CI
 
 on:
   push:
-    branches: [ main, dev/0.9.0-warden-mob-expansion ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [ dev/0.9.0-warden-mob-expansion ]
 
 permissions:
-  contents: read
-
-concurrency:
-  group: incarnate-ci-${{ github.ref }}
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  compile:
+  apply-development-patch:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
 
       - name: Set up Java 25
         uses: actions/setup-java@v6
@@ -33,136 +28,455 @@ jobs:
         with:
           gradle-version: '9.6.1'
 
-      - name: Unit test and compile against Paper 26.2
-        run: gradle clean test classes --stacktrace --warning-mode all
-
-  paper-smoke:
-    needs: compile
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Java 25
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '9.6.1'
-
-      - name: Resolve plugin version
-        id: plugin-meta
+      - name: Apply Warden and Ghast development patch
         shell: bash
         run: |
           set -euo pipefail
-          VERSION=$(sed -n 's/^version: //p' src/main/resources/plugin.yml | head -n1 | tr -d "'\"")
-          test -n "$VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          from pathlib import Path
 
-      - name: Build plugin jar
-        run: gradle clean jar --stacktrace --warning-mode all
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'pattern not found in {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, count), encoding='utf-8')
 
-      - name: Download Paper 26.2 build 121
-        shell: bash
-        run: |
-          set -euo pipefail
-          USER_AGENT='Incarnate-CI (GitHub Actions)'
-          BUILDS=$(curl -fsSL -H "User-Agent: ${USER_AGENT}" 'https://fill.papermc.io/v3/projects/paper/versions/26.2/builds')
-          PAPER_URL=$(printf '%s' "$BUILDS" | jq -r 'first(.[] | select(.id == 121) | .downloads."server:default".url) // empty')
-          test -n "$PAPER_URL"
-          curl -fsSL -H "User-Agent: ${USER_AGENT}" -o paper.jar "$PAPER_URL"
+          replace(
+              'src/main/java/dev/onelsey/incarnate/sense/WardenSenseSnapshot.java',
+              '    String kind,\n    String eventKey,\n    long expiresAfterTick\n',
+              '    String kind,\n    String eventKey,\n    UUID sourceId,\n    long expiresAfterTick\n'
+          )
 
-      - name: Verify Paper startup and shutdown lifecycle
-        shell: bash
-        run: |
-          set -euo pipefail
-          PLUGIN_VERSION='${{ steps.plugin-meta.outputs.version }}'
-          PLUGIN_JAR="build/libs/Incarnate-${PLUGIN_VERSION}.jar"
-          test -f "$PLUGIN_JAR"
+          session = Path('src/main/java/dev/onelsey/incarnate/possession/PossessionSession.java')
+          text = session.read_text(encoding='utf-8')
+          marker = '    private volatile long pandaRollUntilTick = Long.MIN_VALUE;\n'
+          if marker not in text:
+              raise SystemExit('session fields marker not found')
+          text = text.replace(marker, marker + '    private volatile UUID wardenSonicTargetId;\n    private volatile long wardenSonicFireTick = Long.MIN_VALUE;\n    private volatile long ghastFireballFireTick = Long.MIN_VALUE;\n', 1)
+          old = '''    public void recordWardenSense(UUID worldId, double x, double y, double z, String kind, String eventKey, int memoryTicks) {
+        long expires = controlTick + Math.max(1, memoryTicks);
+        this.wardenSense = new WardenSenseSnapshot(worldId, x, y, z, kind, eventKey, expires);
+    }
+'''
+          new = '''    public void recordWardenSense(UUID worldId, double x, double y, double z, String kind, String eventKey, UUID sourceId, int memoryTicks) {
+        long expires = controlTick + Math.max(1, memoryTicks);
+        this.wardenSense = new WardenSenseSnapshot(worldId, x, y, z, kind, eventKey, sourceId, expires);
+    }
+'''
+          if old not in text:
+              raise SystemExit('recordWardenSense block not found')
+          text = text.replace(old, new, 1)
+          action_marker = '''    public void startPandaRoll(int ticks) { pandaRollUntilTick = controlTick + Math.max(1, ticks); }
+    public boolean pandaRollTracked() { return pandaRollUntilTick != Long.MIN_VALUE; }
+    public boolean pandaRollExpired() { return pandaRollTracked() && controlTick > pandaRollUntilTick; }
+    public void clearPandaRoll() { pandaRollUntilTick = Long.MIN_VALUE; }
 
-          mkdir -p ci-server/plugins
-          cp "$PLUGIN_JAR" ci-server/plugins/Incarnate.jar
-          cp paper.jar ci-server/paper.jar
-          printf 'eula=true\n' > ci-server/eula.txt
-          mkfifo ci-server/server-input
-          exec 3<>ci-server/server-input
+'''
+          action_add = action_marker + '''    public void startWardenSonic(UUID targetId, int chargeTicks) {
+        wardenSonicTargetId = targetId;
+        wardenSonicFireTick = controlTick + Math.max(1, chargeTicks);
+    }
 
-          cd ci-server
-          java -Xms768M -Xmx1536M -jar paper.jar --nogui < server-input > ../paper-smoke.log 2>&1 &
-          SERVER_PID=$!
-          cd ..
+    public boolean wardenSonicTracked() { return wardenSonicFireTick != Long.MIN_VALUE && wardenSonicTargetId != null; }
+    public boolean wardenSonicReady() { return wardenSonicTracked() && controlTick >= wardenSonicFireTick; }
+    public UUID wardenSonicTargetId() { return wardenSonicTargetId; }
+    public void clearWardenSonic() {
+        wardenSonicTargetId = null;
+        wardenSonicFireTick = Long.MIN_VALUE;
+    }
 
-          cleanup() {
-            exec 3>&- 2>/dev/null || true
-            if kill -0 "$SERVER_PID" 2>/dev/null; then
-              kill -TERM "$SERVER_PID" 2>/dev/null || true
-              sleep 2
-            fi
-            if kill -0 "$SERVER_PID" 2>/dev/null; then
-              kill -KILL "$SERVER_PID" 2>/dev/null || true
-            fi
-          }
-          trap cleanup EXIT
+    public void startGhastFireball(int chargeTicks) { ghastFireballFireTick = controlTick + Math.max(1, chargeTicks); }
+    public boolean ghastFireballTracked() { return ghastFireballFireTick != Long.MIN_VALUE; }
+    public boolean ghastFireballReady() { return ghastFireballTracked() && controlTick >= ghastFireballFireTick; }
+    public void clearGhastFireball() { ghastFireballFireTick = Long.MIN_VALUE; }
 
-          READY=0
-          for _ in $(seq 1 100); do
-            if grep -Eq 'Done \([^)]*\)! For help, type "help"' paper-smoke.log 2>/dev/null \
-              && grep -Fq "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log 2>/dev/null; then
-              READY=1
-              break
-            fi
-            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-              echo 'Paper exited before startup completed.'
-              cat paper-smoke.log || true
-              exit 1
-            fi
-            sleep 1
-          done
+'''
+          if action_marker not in text:
+              raise SystemExit('session action marker not found')
+          text = text.replace(action_marker, action_add, 1)
+          session.write_text(text, encoding='utf-8')
 
-          if [ "$READY" -ne 1 ]; then
-            echo 'Timed out waiting for Paper and Incarnate startup.'
-            cat paper-smoke.log || true
-            exit 1
-          fi
+          manager = Path('src/main/java/dev/onelsey/incarnate/possession/PossessionManager.java')
+          text = manager.read_text(encoding='utf-8')
+          old = '            session.recordWardenSense(worldId, x, y, z, kind, eventKey, wardenSenseMemoryTicks);\n'
+          new = '            session.recordWardenSense(worldId, x, y, z, kind, eventKey, sourceId, wardenSenseMemoryTicks);\n'
+          if old not in text:
+              raise SystemExit('warden sense call not found')
+          manager.write_text(text.replace(old, new, 1), encoding='utf-8')
 
-          printf 'stop\n' >&3
-          exec 3>&-
+          ability = Path('src/main/java/dev/onelsey/incarnate/ability/AbilityRegistry.java')
+          text = ability.read_text(encoding='utf-8')
+          text = text.replace('import org.bukkit.Material;\n', 'import org.bukkit.Material;\nimport org.bukkit.Particle;\nimport org.bukkit.Sound;\nimport org.bukkit.SoundCategory;\nimport org.bukkit.attribute.Attribute;\nimport org.bukkit.attribute.AttributeInstance;\nimport org.bukkit.damage.DamageSource;\nimport org.bukkit.damage.DamageType;\n', 1)
+          text = text.replace('import org.bukkit.entity.Witch;\n', 'import org.bukkit.entity.Witch;\nimport org.bukkit.entity.Warden;\n', 1)
+          field_marker = '    private final int pandaRollLockTicks;\n'
+          if field_marker not in text:
+              raise SystemExit('ability field marker not found')
+          text = text.replace(field_marker, field_marker + '''    private final boolean wardenSonicEnabled;
+    private final double wardenSonicRange;
+    private final double wardenSonicDamage;
+    private final double wardenSonicHorizontalKnockback;
+    private final double wardenSonicVerticalKnockback;
+    private final double wardenSonicParticleStep;
+    private final int wardenSonicChargeTicks;
+    private final int wardenSonicCooldownTicks;
+    private final boolean ghastFireballEnabled;
+    private final double ghastFireballSpeed;
+    private final int ghastFireballChargeTicks;
+    private final int ghastFireballCooldownTicks;
+''', 1)
+          constructor_marker = '        this.pandaRollLockTicks = Math.max(1, config.getInt("abilities.panda-roll.movement-lock-ticks", 12));\n'
+          constructor_add = constructor_marker + '''        this.wardenSonicEnabled = config.getBoolean("abilities.warden-sonic.enabled", true);
+        this.wardenSonicRange = Math.max(2.0, config.getDouble("abilities.warden-sonic.range", 20.0));
+        this.wardenSonicDamage = Math.max(0.0, config.getDouble("abilities.warden-sonic.damage", 10.0));
+        this.wardenSonicHorizontalKnockback = Math.max(0.0, config.getDouble("abilities.warden-sonic.horizontal-knockback", 2.5));
+        this.wardenSonicVerticalKnockback = Math.max(0.0, config.getDouble("abilities.warden-sonic.vertical-knockback", 0.5));
+        this.wardenSonicParticleStep = Math.max(0.25, config.getDouble("abilities.warden-sonic.particle-step", 0.5));
+        this.wardenSonicChargeTicks = Math.max(1, config.getInt("abilities.warden-sonic.charge-ticks", 34));
+        this.wardenSonicCooldownTicks = Math.max(1, config.getInt("abilities.warden-sonic.cooldown-ticks", 80));
+        this.ghastFireballEnabled = config.getBoolean("abilities.ghast-fireball.enabled", true);
+        this.ghastFireballSpeed = Math.max(0.1, config.getDouble("abilities.ghast-fireball.speed", 1.0));
+        this.ghastFireballChargeTicks = Math.max(1, config.getInt("abilities.ghast-fireball.charge-ticks", 20));
+        this.ghastFireballCooldownTicks = Math.max(1, config.getInt("abilities.ghast-fireball.cooldown-ticks", 60));
+'''
+          if constructor_marker not in text:
+              raise SystemExit('ability constructor marker not found')
+          text = text.replace(constructor_marker, constructor_add, 1)
 
-          STOPPED=0
-          for _ in $(seq 1 45); do
-            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-              STOPPED=1
-              break
-            fi
-            sleep 1
-          done
+          primary_marker = '''        if (vessel instanceof Creeper creeper && creeperEnabled) {
+            return toggleCreeper(session, creeper);
+        }
+'''
+          if primary_marker not in text:
+              raise SystemExit('primary marker not found')
+          text = text.replace(primary_marker, primary_marker + '''        if (vessel instanceof Ghast ghast && ghastFireballEnabled) {
+            return startGhastFireball(session, ghast);
+        }
+''', 1)
 
-          if [ "$STOPPED" -ne 1 ]; then
-            echo 'Paper did not stop cleanly after the stop command.'
-            cat paper-smoke.log || true
-            exit 1
-          fi
+          secondary_marker = '''        if (vessel instanceof Panda panda && pandaRollEnabled) {
+            return rollPanda(session, panda);
+        }
+'''
+          if secondary_marker not in text:
+              raise SystemExit('secondary marker not found')
+          text = text.replace(secondary_marker, secondary_marker + '''        if (vessel instanceof Warden warden && wardenSonicEnabled) {
+            return startWardenSonic(session, warden);
+        }
+''', 1)
 
-          wait "$SERVER_PID" || true
-          trap - EXIT
-          cat paper-smoke.log
+          tick_marker = '''        if (vessel instanceof Panda panda) {
+            tickPandaRoll(session, panda);
+        }
+'''
+          if tick_marker not in text:
+              raise SystemExit('tick marker not found')
+          text = text.replace(tick_marker, tick_marker + '''        if (vessel instanceof Warden warden) {
+            tickWardenSonic(session, warden);
+        }
+        if (vessel instanceof Ghast ghast) {
+            tickGhastFireball(session, ghast);
+        }
+''', 1)
 
-          grep -F "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log
-          grep -F "Disabling Incarnate v${PLUGIN_VERSION}" paper-smoke.log
+          abort_marker = '''        if (vessel instanceof Panda panda && session.pandaRollTracked()) {
+            panda.setRolling(false);
+            session.clearPandaRoll();
+        }
+'''
+          if abort_marker not in text:
+              raise SystemExit('abort marker not found')
+          text = text.replace(abort_marker, abort_marker + '''        if (vessel instanceof Warden && session.wardenSonicTracked()) {
+            session.clearWardenSonic();
+        }
+        if (vessel instanceof Ghast ghast && session.ghastFireballTracked()) {
+            ghast.setCharging(false);
+            session.clearGhastFireball();
+        }
+''', 1)
 
-          if grep -E 'Error occurred while enabling Incarnate|Error occurred while disabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate|IllegalPluginAccessException' paper-smoke.log; then
-            exit 1
-          fi
+          primary_label = '        if (vessel instanceof Creeper && creeperEnabled) return "fuse";\n'
+          if primary_label not in text:
+              raise SystemExit('primary label marker not found')
+          text = text.replace(primary_label, primary_label + '        if (vessel instanceof Ghast && ghastFireballEnabled) return "ghast-fireball";\n', 1)
+          secondary_label = '        if (vessel instanceof Panda && pandaRollEnabled) return "panda-roll";\n'
+          if secondary_label not in text:
+              raise SystemExit('secondary label marker not found')
+          text = text.replace(secondary_label, secondary_label + '        if (vessel instanceof Warden && wardenSonicEnabled) return "sonic-boom";\n', 1)
 
-      - name: Upload validated Incarnate JAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: Incarnate-${{ steps.plugin-meta.outputs.version }}
-          path: build/libs/Incarnate-${{ steps.plugin-meta.outputs.version }}.jar
-          if-no-files-found: error
-          retention-days: 30
+          insert_before = '    private boolean shootDragonFireball(PossessionSession session, EnderDragon dragon) {\n'
+          methods = '''    private boolean startWardenSonic(PossessionSession session, Warden warden) {
+        if (session.wardenSonicTracked()) {
+            return false;
+        }
+        var sense = session.activeWardenSense();
+        if (sense == null || sense.sourceId() == null) {
+            return false;
+        }
+        Entity rawTarget = Bukkit.getEntity(sense.sourceId());
+        if (!(rawTarget instanceof LivingEntity target)
+            || !Bukkit.isOwnedByCurrentRegion(target)
+            || !target.isValid()
+            || target.isDead()
+            || target.getUniqueId().equals(session.playerId())
+            || target.getUniqueId().equals(session.vesselId())
+            || target.getWorld() != warden.getWorld()
+            || warden.getEyeLocation().distanceSquared(target.getEyeLocation()) > wardenSonicRange * wardenSonicRange
+            || !session.acquireSecondaryCooldown(Math.max(wardenSonicCooldownTicks, wardenSonicChargeTicks))) {
+            return false;
+        }
+
+        session.startWardenSonic(target.getUniqueId(), wardenSonicChargeTicks);
+        session.lockMovementControl(wardenSonicChargeTicks + 2);
+        warden.setVelocity(new Vector());
+        warden.getWorld().playSound(warden.getLocation(), Sound.ENTITY_WARDEN_SONIC_CHARGE, SoundCategory.HOSTILE, 3.0f, 1.0f);
+        return true;
+    }
+
+    private void tickWardenSonic(PossessionSession session, Warden warden) {
+        if (!session.wardenSonicTracked()) {
+            return;
+        }
+        UUID targetId = session.wardenSonicTargetId();
+        Entity rawTarget = targetId == null ? null : Bukkit.getEntity(targetId);
+        if (!(rawTarget instanceof LivingEntity target)
+            || !Bukkit.isOwnedByCurrentRegion(target)
+            || !target.isValid()
+            || target.isDead()
+            || target.getWorld() != warden.getWorld()
+            || warden.getEyeLocation().distanceSquared(target.getEyeLocation()) > wardenSonicRange * wardenSonicRange) {
+            session.clearWardenSonic();
+            return;
+        }
+        if (!session.wardenSonicReady()) {
+            warden.setVelocity(new Vector());
+            return;
+        }
+        emitWardenSonic(warden, target);
+        session.clearWardenSonic();
+    }
+
+    private void emitWardenSonic(Warden warden, LivingEntity target) {
+        Location start = warden.getEyeLocation();
+        Location end = target.getEyeLocation();
+        Vector delta = end.toVector().subtract(start.toVector());
+        double distance = delta.length();
+        if (distance < 1.0E-6) {
+            return;
+        }
+        Vector normalized = delta.clone().multiply(1.0 / distance);
+        for (double travel = 1.0; travel < distance; travel += wardenSonicParticleStep) {
+            Location point = start.clone().add(normalized.clone().multiply(travel));
+            warden.getWorld().spawnParticle(Particle.SONIC_BOOM, point, 1);
+        }
+        warden.getWorld().playSound(warden.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, SoundCategory.HOSTILE, 3.0f, 1.0f);
+
+        DamageSource source = DamageSource.builder(DamageType.SONIC_BOOM)
+            .withCausingEntity(warden)
+            .withDirectEntity(warden)
+            .build();
+        target.damage(wardenSonicDamage, source);
+
+        AttributeInstance resistanceAttribute = target.getAttribute(Attribute.KNOCKBACK_RESISTANCE);
+        double resistance = resistanceAttribute == null ? 0.0 : resistanceAttribute.getValue();
+        double scale = WardenSonicMath.resistanceScale(resistance);
+        Vector knockback = new Vector(
+            normalized.getX() * wardenSonicHorizontalKnockback * scale,
+            normalized.getY() * wardenSonicVerticalKnockback * scale,
+            normalized.getZ() * wardenSonicHorizontalKnockback * scale
+        );
+        target.setVelocity(target.getVelocity().add(knockback));
+    }
+
+    private boolean startGhastFireball(PossessionSession session, Ghast ghast) {
+        if (session.ghastFireballTracked()
+            || !session.acquirePrimaryCooldown(Math.max(ghastFireballCooldownTicks, ghastFireballChargeTicks))) {
+            return false;
+        }
+        ghast.setCharging(true);
+        ghast.setVelocity(new Vector());
+        session.startGhastFireball(ghastFireballChargeTicks);
+        session.lockMovementControl(ghastFireballChargeTicks);
+        ghast.getWorld().playSound(ghast.getLocation(), Sound.ENTITY_GHAST_WARN, SoundCategory.HOSTILE, 10.0f, 1.0f);
+        return true;
+    }
+
+    private void tickGhastFireball(PossessionSession session, Ghast ghast) {
+        if (!session.ghastFireballTracked()) {
+            return;
+        }
+        if (!ghast.isCharging()) {
+            ghast.setCharging(true);
+        }
+        if (!session.ghastFireballReady()) {
+            return;
+        }
+        Vector velocity = direction(session.view()).multiply(ghastFireballSpeed);
+        LargeFireball fireball = ghast.launchProjectile(LargeFireball.class, velocity);
+        fireball.setYield(ghast.getExplosionPower());
+        ghast.getWorld().playSound(ghast.getLocation(), Sound.ENTITY_GHAST_SHOOT, SoundCategory.HOSTILE, 10.0f, 1.0f);
+        ghast.setCharging(false);
+        session.clearGhastFireball();
+    }
+
+'''
+          if insert_before not in text:
+              raise SystemExit('ability method insertion marker not found')
+          text = text.replace(insert_before, methods + insert_before, 1)
+          ghast_generic = '''        if (vessel instanceof Ghast) {
+            return LargeFireball.class;
+        }
+'''
+          if ghast_generic not in text:
+              raise SystemExit('generic ghast projectile mapping not found')
+          text = text.replace(ghast_generic, '', 1)
+          ability.write_text(text, encoding='utf-8')
+
+          sonic_math = Path('src/main/java/dev/onelsey/incarnate/ability/WardenSonicMath.java')
+          sonic_math.write_text('''package dev.onelsey.incarnate.ability;
+
+public final class WardenSonicMath {
+    private WardenSonicMath() {
+    }
+
+    public static double resistanceScale(double resistance) {
+        if (!Double.isFinite(resistance)) {
+            return 1.0;
+        }
+        return 1.0 - Math.max(0.0, Math.min(1.0, resistance));
+    }
+}
+''', encoding='utf-8')
+
+          sonic_test = Path('src/test/java/dev/onelsey/incarnate/ability/WardenSonicMathTest.java')
+          sonic_test.parent.mkdir(parents=True, exist_ok=True)
+          sonic_test.write_text('''package dev.onelsey.incarnate.ability;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class WardenSonicMathTest {
+    @Test
+    void resistanceScalesVanillaKnockbackRange() {
+        assertEquals(1.0, WardenSonicMath.resistanceScale(0.0));
+        assertEquals(0.5, WardenSonicMath.resistanceScale(0.5));
+        assertEquals(0.0, WardenSonicMath.resistanceScale(1.0));
+        assertEquals(0.0, WardenSonicMath.resistanceScale(2.0));
+        assertEquals(1.0, WardenSonicMath.resistanceScale(-1.0));
+        assertEquals(1.0, WardenSonicMath.resistanceScale(Double.NaN));
+    }
+}
+''', encoding='utf-8')
+
+          vessel = Path('src/main/java/dev/onelsey/incarnate/possession/VesselState.java')
+          text = vessel.read_text(encoding='utf-8')
+          text = text.replace('import org.bukkit.entity.Guardian;\n', 'import org.bukkit.entity.Guardian;\nimport org.bukkit.entity.Ghast;\n', 1)
+          text = text.replace('    Boolean batAwake,\n', '    Boolean batAwake,\n    Boolean ghastCharging,\n', 1)
+          text = text.replace('        Boolean batAwake = mob instanceof Bat bat ? bat.isAwake() : null;\n', '        Boolean batAwake = mob instanceof Bat bat ? bat.isAwake() : null;\n        Boolean ghastCharging = mob instanceof Ghast ghast ? ghast.isCharging() : null;\n', 1)
+          text = text.replace('            batAwake,\n            creeperIgnited,\n', '            batAwake,\n            ghastCharging,\n            creeperIgnited,\n', 1)
+          bat_apply = '''        if (mob instanceof Bat bat) {
+            bat.setAwake(true);
+            bat.setTargetLocation(null);
+        }
+'''
+          if bat_apply not in text:
+              raise SystemExit('vessel bat apply marker not found')
+          text = text.replace(bat_apply, bat_apply + '''        if (mob instanceof Ghast ghast) {
+            ghast.setCharging(false);
+        }
+''', 1)
+          bat_restore = '''        if (mob instanceof Bat bat && batAwake != null) {
+            bat.setAwake(batAwake);
+            bat.setTargetLocation(null);
+        }
+'''
+          if bat_restore not in text:
+              raise SystemExit('vessel bat restore marker not found')
+          text = text.replace(bat_restore, bat_restore + '''        if (mob instanceof Ghast ghast && ghastCharging != null) {
+            ghast.setCharging(ghastCharging);
+        }
+''', 1)
+          vessel.write_text(text, encoding='utf-8')
+
+          recovery = Path('src/main/java/dev/onelsey/incarnate/possession/VesselRecoveryStore.java')
+          text = recovery.read_text(encoding='utf-8')
+          text = text.replace('import org.bukkit.entity.Guardian;\n', 'import org.bukkit.entity.Guardian;\nimport org.bukkit.entity.Ghast;\n', 1)
+          text = text.replace('    private final NamespacedKey batAwakeKey;\n', '    private final NamespacedKey batAwakeKey;\n    private final NamespacedKey ghastChargingKey;\n', 1)
+          text = text.replace('        this.batAwakeKey = new NamespacedKey(plugin, "vessel_recovery_bat_awake");\n', '        this.batAwakeKey = new NamespacedKey(plugin, "vessel_recovery_bat_awake");\n        this.ghastChargingKey = new NamespacedKey(plugin, "vessel_recovery_ghast_charging");\n', 1)
+          text = text.replace('            setNullableBool(data, batAwakeKey, state.batAwake());\n', '            setNullableBool(data, batAwakeKey, state.batAwake());\n            setNullableBool(data, ghastChargingKey, state.ghastCharging());\n', 1)
+          recover_bat = '''        if (mob instanceof Bat bat) {
+            Boolean awake = readNullableBool(data, batAwakeKey);
+            if (awake != null) {
+                bat.setAwake(awake);
+                bat.setTargetLocation(null);
+            }
+        }
+'''
+          if recover_bat not in text:
+              raise SystemExit('recovery bat marker not found')
+          text = text.replace(recover_bat, recover_bat + '''        if (mob instanceof Ghast ghast) {
+            Boolean charging = readNullableBool(data, ghastChargingKey);
+            if (charging != null) {
+                ghast.setCharging(charging);
+            }
+        }
+''', 1)
+          clear_marker = '        data.remove(batAwakeKey);\n'
+          if clear_marker not in text:
+              raise SystemExit('recovery clear marker not found')
+          text = text.replace(clear_marker, clear_marker + '        data.remove(ghastChargingKey);\n', 1)
+          recovery.write_text(text, encoding='utf-8')
+
+          config = Path('src/main/resources/config.yml')
+          text = config.read_text(encoding='utf-8')
+          if not text.startswith('config-version: 6'):
+              raise SystemExit('config schema 6 header not found')
+          text = text.replace('config-version: 6', 'config-version: 7', 1)
+          panda = '''  panda-roll:
+    enabled: true
+    speed: 0.60
+    vertical-velocity: 0.10
+    duration-ticks: 12
+    cooldown-ticks: 30
+    movement-lock-ticks: 12
+'''
+          if panda not in text:
+              raise SystemExit('panda config marker not found')
+          text = text.replace(panda, panda + '''  warden-sonic:
+    enabled: true
+    range: 20.0
+    damage: 10.0
+    horizontal-knockback: 2.5
+    vertical-knockback: 0.5
+    particle-step: 0.5
+    charge-ticks: 34
+    cooldown-ticks: 80
+  ghast-fireball:
+    enabled: true
+    speed: 1.0
+    charge-ticks: 20
+    cooldown-ticks: 60
+''', 1)
+          config.write_text(text, encoding='utf-8')
+
+          replace('src/main/java/dev/onelsey/incarnate/config/ConfigMigrator.java', 'private static final int CURRENT_SCHEMA = 6;', 'private static final int CURRENT_SCHEMA = 7;')
+          for path in ['src/test/java/dev/onelsey/incarnate/config/ConfigMigratorTest.java', 'src/test/java/dev/onelsey/incarnate/message/MessageResourcesTest.java']:
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              text = text.replace('assertEquals(6, user.getInt("config-version"));', 'assertEquals(7, user.getInt("config-version"));')
+              text = text.replace('assertEquals(6, config.getInt("config-version"));', 'assertEquals(7, config.getInt("config-version"));')
+              p.write_text(text, encoding='utf-8')
+
+          replace('build.gradle.kts', 'version = "0.9.0-dev.1"', 'version = "0.9.0-dev.2"')
+          replace('src/main/resources/plugin.yml', 'version: 0.9.0-dev.1', 'version: 0.9.0-dev.2')
+          PY
+
+          gradle clean test classes --stacktrace --warning-mode all
+          git checkout HEAD^ -- .github/workflows/ci.yml
+          rm -f .github/workflows/dev-warden-sonic-ghast.yml
+          git config user.name Onelsey
+          git config user.email 103017546+Wandraker@users.noreply.github.com
+          git add -A
+          git commit -m "Add Warden sonic control and Ghast attack fidelity"
+          git push origin HEAD:dev/0.9.0-warden-mob-expansion
