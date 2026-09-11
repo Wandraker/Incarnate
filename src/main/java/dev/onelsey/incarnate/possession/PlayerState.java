@@ -12,6 +12,7 @@ public record PlayerState(
     boolean flying,
     boolean invulnerable,
     boolean collidable,
+    boolean invisible,
     boolean affectsSpawning
 ) {
     public static PlayerState capture(Player player) {
@@ -23,6 +24,7 @@ public record PlayerState(
             player.isFlying(),
             player.isInvulnerable(),
             player.isCollidable(),
+            player.isInvisible(),
             player.getAffectsSpawning()
         );
     }

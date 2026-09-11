@@ -1,13 +1,20 @@
-config-version: 11
+config-version: 12
 
 control:
   max-possession-distance: 8.0
   release-at-vessel: true
 
 camera:
-  mode: DIRECT_ENTITY
+  mode: CAMERA_RIG
   attach-retries: 8
   fallback-to-spectator-target: false
+  rig:
+    vertical-offset: 0.0
+    adaptive-third-person-distance: true
+    third-person-base: 2.5
+    third-person-body-scale: 1.35
+    third-person-minimum: 4.0
+    third-person-maximum: 32.0
 
 hud:
   actionbar:

@@ -93,7 +93,7 @@ When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible 
 - the migrated file is written through a temporary file and atomic replace when the filesystem supports it;
 - a configuration from a newer unsupported schema is rejected rather than silently downgraded.
 
-Schema 11 intentionally migrates the former default `camera.mode: MOUNTED` to `DIRECT_ENTITY` and carries `camera.mount-retries` into `camera.attach-retries`, because the passenger camera is now a legacy compatibility mode rather than the recommended possession path.
+Schema 12 migrates the experimental schema-11 `camera.mode: DIRECT_ENTITY` default to `CAMERA_RIG`. The native entity-camera experiment remains available only as a diagnostic legacy mode; the recommended path keeps the LocalPlayer as its own vanilla camera/input source.
 
 ## Current implementation
 
@@ -103,22 +103,31 @@ Existing possession keeps the same Mob UUID and preserves its equipment/state. C
 
 Ender Dragon and Shulker now use dedicated complex-body controllers and are enabled by default. They can still be disabled through `excluded-types`.
 
-### Native entity camera
+### Anchored camera rig
 
-The default camera transport is now `DIRECT_ENTITY`. The controller remains a real Adventure-mode Player for normal vanilla input, but the server camera is bound directly to the real controlled Mob instead of mounting the Player as a passenger.
+The default camera transport is `CAMERA_RIG`. The controller stays a real Adventure-mode Player and remains its own vanilla client camera entity, preserving ordinary mouse rotation, `F`, `Shift + F`, sprint and movement input.
 
-Incarnate uses the vanilla server `ServerPlayer#setCamera` path through a reflection bridge. This keeps the server aware of the camera target rather than faking only the client view. The hidden controller is moved to the vessel during acquisition, world interaction remains isolated, and positional Player movement is frozen while look/input updates continue driving the Mob.
+Instead of mounting the Player directly on the possessed Mob or redirecting the client through spectator camera semantics, Incarnate creates a zero-size invisible non-persistent camera anchor. The hidden Player rides that transport-only anchor, while the anchor follows the controlled body's eye-position snapshot. The real Mob remains the authoritative visible body.
 
 ```yaml
 camera:
-  mode: DIRECT_ENTITY
+  mode: CAMERA_RIG
   attach-retries: 8
   fallback-to-spectator-target: false
+  rig:
+    vertical-offset: 0.0
+    adaptive-third-person-distance: true
+    third-person-base: 2.5
+    third-person-body-scale: 1.35
+    third-person-minimum: 4.0
+    third-person-maximum: 32.0
 ```
 
-Because the actual camera entity is the Mob, first person uses the Mob's native camera/eye position and vanilla F5 remains available. In third person the client should render the real Mob body rather than a seated hidden Player. Vanilla still owns third-person distance and collision clipping, so very large/complex bodies such as Ender Dragon require live tuning before their F5 presentation can be called final.
+Rig dismount attempts are cancelled and the runtime verifies the Player remains attached. If the passenger link is unexpectedly lost, Incarnate attempts to restore it; an unrecoverable rig failure ends possession fail-closed rather than leaving a partially active session. Same-region anchor movement is synchronous, while Folia region crossings use asynchronous entity teleportation.
 
-`MOUNTED` and `SPECTATOR_TARGET` remain explicit legacy modes for diagnosis/compatibility. They are not the fresh default. True Spectator remains unsuitable for the primary path because it suppresses vanilla inputs that Incarnate uses.
+The hidden controller is invisible while possession is active, and the original invisibility state is part of interrupted-session recovery. Vanilla F5 remains client-native; Incarnate applies a transient `CAMERA_DISTANCE` modifier scaled to the vessel dimensions and removes it on release. Large bodies such as Ender Dragon still require live presentation tuning because their rendered head/body geometry is much more complex than their base entity dimensions.
+
+`DIRECT_ENTITY`, `MOUNTED` and `SPECTATOR_TARGET` remain explicit legacy/diagnostic transports. They are not fresh defaults.
 
 ### Possession HUD
 

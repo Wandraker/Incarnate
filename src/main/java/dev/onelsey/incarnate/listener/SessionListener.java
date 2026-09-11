@@ -158,10 +158,15 @@ public final class SessionListener implements Listener {
             return;
         }
         PossessionSession session = possessions.session(player);
-        if (session == null || !session.isActive() || !session.usesMountedCamera()) {
+        if (session == null || !session.isActive()) {
             return;
         }
-        if (event.getDismounted().getUniqueId().equals(session.vesselId()) && event.isCancellable()) {
+        boolean mountedVessel = session.usesMountedCamera()
+            && event.getDismounted().getUniqueId().equals(session.vesselId());
+        boolean cameraRig = session.usesCameraRig()
+            && session.cameraRigId() != null
+            && event.getDismounted().getUniqueId().equals(session.cameraRigId());
+        if ((mountedVessel || cameraRig) && event.isCancellable()) {
             session.markSpectatorShiftAttempt();
             event.setCancelled(true);
         }

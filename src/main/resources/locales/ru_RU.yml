@@ -74,6 +74,7 @@ messages:
       front-left: 'слева-впереди'
 
   camera:
+    rig-anchor: 'якорная камера'
     direct-entity: 'камера от лица сущности'
     mounted-free-look: 'старая камера с посадкой'
     legacy-spectator-fallback: 'резервная spectator-камера'

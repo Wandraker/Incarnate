@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0-dev.8 - Anchored Camera Rig
+
+- Replaces the broken native `ServerPlayer#setCamera` default with an anchored camera rig that keeps the vanilla LocalPlayer as its own camera entity, preserving normal mouse rotation, `F`, `Shift + F`, sprint and movement input.
+- Uses a zero-size invisible non-persistent ArmorStand as a transport-only camera anchor. The Player rides the anchor, not the possessed Mob, and the anchor follows a vessel eye-position snapshot every tick.
+- Cancels rig dismounts and adds a runtime watchdog that reattaches the controller if the passenger link is lost; unrecoverable camera-rig failures end possession fail-closed instead of leaving a half-active session.
+- Makes the hidden controller invisible during possession and persists/restores the original invisibility state through interrupted-session recovery.
+- Adds adaptive vanilla F5 distance through the transient `CAMERA_DISTANCE` attribute, scaled from the vessel dimensions and removed on release.
+- Uses synchronous rig movement inside the currently owned Folia region and `teleportAsync` only when the vessel anchor crosses into another region.
+- Keeps `DIRECT_ENTITY`, `MOUNTED` and `SPECTATOR_TARGET` as explicit legacy/diagnostic camera transports. Fresh and schema-11 configs migrate to `CAMERA_RIG`.
+- Advances gameplay config schema to 12.
+
 ## 0.9.0-dev.7 - Native Entity Camera
 
 - Replaces the default passenger-based camera with a direct vanilla entity camera while keeping the controller in real Adventure mode, preserving the working `F`, `Shift + F`, sprint and ordinary input path from dev.6.

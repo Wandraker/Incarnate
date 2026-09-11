@@ -60,10 +60,16 @@ public final class PossessionSession {
     private volatile boolean foxSleepingControlled;
     private volatile long lastSpectatorShiftAttemptNanos = Long.MIN_VALUE;
     private volatile CameraTransport cameraTransport = CameraTransport.NONE;
+    private volatile UUID cameraRigId;
+    private volatile ScheduledTask cameraRigTask;
+    private final AtomicBoolean cameraRigTeleportInProgress = new AtomicBoolean(false);
     private volatile boolean cameraTeleportInProgress;
     private volatile String primaryAbilityKey = "none";
     private volatile String secondaryAbilityKey = "none";
     private volatile VesselTelemetry telemetry;
+    private final double vesselEyeHeight;
+    private final double vesselWidth;
+    private final double vesselHeight;
 
     public PossessionSession(
         UUID playerId,
@@ -89,6 +95,9 @@ public final class PossessionSession {
         this.lastKnownVesselLocation = vessel.getLocation().clone();
         this.vesselPosition = VesselPositionSnapshot.from(this.lastKnownVesselLocation);
         this.telemetry = new VesselTelemetry(vessel.getHealth(), maxHealth(vessel));
+        this.vesselEyeHeight = vessel.getEyeHeight();
+        this.vesselWidth = vessel.getWidth();
+        this.vesselHeight = vessel.getHeight();
     }
 
     public UUID playerId() { return playerId; }
@@ -193,6 +202,17 @@ public final class PossessionSession {
 
     public CameraTransport cameraTransport() { return cameraTransport; }
     public void cameraTransport(CameraTransport cameraTransport) { this.cameraTransport = cameraTransport; }
+    public boolean usesCameraRig() { return cameraTransport == CameraTransport.CAMERA_RIG; }
+    public UUID cameraRigId() { return cameraRigId; }
+    public void cameraRigId(UUID cameraRigId) { this.cameraRigId = cameraRigId; }
+    public ScheduledTask cameraRigTask() { return cameraRigTask; }
+    public void cameraRigTask(ScheduledTask cameraRigTask) { this.cameraRigTask = cameraRigTask; }
+    public boolean beginCameraRigTeleport() { return cameraRigTeleportInProgress.compareAndSet(false, true); }
+    public void endCameraRigTeleport() { cameraRigTeleportInProgress.set(false); }
+    public boolean cameraRigTeleportInProgress() { return cameraRigTeleportInProgress.get(); }
+    public double vesselEyeHeight() { return vesselEyeHeight; }
+    public double vesselWidth() { return vesselWidth; }
+    public double vesselHeight() { return vesselHeight; }
     public boolean usesDirectEntityCamera() { return cameraTransport == CameraTransport.DIRECT_ENTITY; }
     public boolean usesMountedCamera() { return cameraTransport == CameraTransport.MOUNTED; }
     public boolean usesSpectatorTargetCamera() { return cameraTransport == CameraTransport.SPECTATOR_TARGET; }

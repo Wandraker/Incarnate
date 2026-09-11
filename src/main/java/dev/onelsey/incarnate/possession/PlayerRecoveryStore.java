@@ -22,6 +22,7 @@ public final class PlayerRecoveryStore {
     private final NamespacedKey flySpeedKey;
     private final NamespacedKey invulnerableKey;
     private final NamespacedKey collidableKey;
+    private final NamespacedKey invisibleKey;
     private final NamespacedKey affectsSpawningKey;
     private final NamespacedKey worldKey;
     private final NamespacedKey xKey;
@@ -39,6 +40,7 @@ public final class PlayerRecoveryStore {
         this.flySpeedKey = new NamespacedKey(plugin, "recovery_fly_speed");
         this.invulnerableKey = new NamespacedKey(plugin, "recovery_invulnerable");
         this.collidableKey = new NamespacedKey(plugin, "recovery_collidable");
+        this.invisibleKey = new NamespacedKey(plugin, "recovery_invisible");
         this.affectsSpawningKey = new NamespacedKey(plugin, "recovery_affects_spawning");
         this.worldKey = new NamespacedKey(plugin, "recovery_world");
         this.xKey = new NamespacedKey(plugin, "recovery_x");
@@ -57,6 +59,7 @@ public final class PlayerRecoveryStore {
         data.set(flySpeedKey, PersistentDataType.FLOAT, state.flySpeed());
         data.set(invulnerableKey, PersistentDataType.BYTE, bool(state.invulnerable()));
         data.set(collidableKey, PersistentDataType.BYTE, bool(state.collidable()));
+        data.set(invisibleKey, PersistentDataType.BYTE, bool(state.invisible()));
         data.set(affectsSpawningKey, PersistentDataType.BYTE, bool(state.affectsSpawning()));
 
         Location location = state.location();
@@ -119,6 +122,7 @@ public final class PlayerRecoveryStore {
         Float flySpeed = data.get(flySpeedKey, PersistentDataType.FLOAT);
         boolean invulnerable = readBool(data, invulnerableKey, false);
         boolean collidable = readBool(data, collidableKey, true);
+        boolean invisible = readBool(data, invisibleKey, false);
         boolean affectsSpawning = readBool(data, affectsSpawningKey, true);
         String rawWorld = data.get(worldKey, PersistentDataType.STRING);
         Double x = data.get(xKey, PersistentDataType.DOUBLE);
@@ -155,6 +159,7 @@ public final class PlayerRecoveryStore {
         player.setGameMode(mode);
         player.setInvulnerable(invulnerable);
         player.setCollidable(collidable);
+        player.setInvisible(invisible);
         player.setAffectsSpawning(affectsSpawning);
         player.setAllowFlight(allowFlight);
         if (flySpeed != null && flySpeed >= -1.0f && flySpeed <= 1.0f) {
@@ -200,6 +205,7 @@ public final class PlayerRecoveryStore {
         data.remove(flySpeedKey);
         data.remove(invulnerableKey);
         data.remove(collidableKey);
+        data.remove(invisibleKey);
         data.remove(affectsSpawningKey);
         data.remove(worldKey);
         data.remove(xKey);

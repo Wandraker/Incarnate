@@ -57,6 +57,7 @@ public final class PossessionManager {
     private final int cameraAttachRetries;
     private final boolean cameraFallbackToSpectatorTarget;
     private final DirectCameraBridge directCameraBridge;
+    private final CameraRigManager cameraRigManager;
     private final boolean hudEnabled;
     private final int hudIntervalTicks;
     private final boolean hudShowHealth;
@@ -89,15 +90,16 @@ public final class PossessionManager {
         this.releaseAtVessel = plugin.getConfig().getBoolean("control.release-at-vessel", true);
         CameraTransport configuredCamera;
         try {
-            configuredCamera = CameraTransport.valueOf(plugin.getConfig().getString("camera.mode", "DIRECT_ENTITY").toUpperCase(java.util.Locale.ROOT));
+            configuredCamera = CameraTransport.valueOf(plugin.getConfig().getString("camera.mode", "CAMERA_RIG").toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            plugin.getLogger().warning("Unknown camera.mode; using DIRECT_ENTITY.");
-            configuredCamera = CameraTransport.DIRECT_ENTITY;
+            plugin.getLogger().warning("Unknown camera.mode; using CAMERA_RIG.");
+            configuredCamera = CameraTransport.CAMERA_RIG;
         }
-        this.cameraMode = configuredCamera == CameraTransport.NONE ? CameraTransport.DIRECT_ENTITY : configuredCamera;
+        this.cameraMode = configuredCamera == CameraTransport.NONE ? CameraTransport.CAMERA_RIG : configuredCamera;
         this.cameraAttachRetries = Math.max(1, plugin.getConfig().getInt("camera.attach-retries", 8));
         this.cameraFallbackToSpectatorTarget = plugin.getConfig().getBoolean("camera.fallback-to-spectator-target", false);
         this.directCameraBridge = new DirectCameraBridge(plugin);
+        this.cameraRigManager = new CameraRigManager(plugin, session -> requestRelease(session, ReleaseReason.INTERNAL_ERROR));
         this.hudEnabled = plugin.getConfig().getBoolean("hud.actionbar.enabled", true);
         this.hudIntervalTicks = Math.max(1, plugin.getConfig().getInt("hud.actionbar.interval-ticks", 4));
         this.hudShowHealth = plugin.getConfig().getBoolean("hud.actionbar.show-health", true);
@@ -321,8 +323,14 @@ public final class PossessionManager {
                 attachSpectatorTargetCamera(session, false);
             } else if (cameraMode == CameraTransport.MOUNTED) {
                 attachMountedCamera(session);
-            } else {
+            } else if (cameraMode == CameraTransport.DIRECT_ENTITY) {
                 attachDirectEntityCamera(session, 0);
+            } else {
+                if (!cameraRigManager.attach(session)) {
+                    requestRelease(session, ReleaseReason.INTERNAL_ERROR);
+                    return;
+                }
+                sendAcquiredMessage(session, "camera.rig-anchor");
             }
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
         if (attachTask == null) {
@@ -344,6 +352,7 @@ public final class PossessionManager {
         player.setAllowFlight(false);
         player.setInvulnerable(true);
         player.setCollidable(false);
+        player.setInvisible(true);
         player.setAffectsSpawning(false);
     }
 
@@ -904,6 +913,11 @@ public final class PossessionManager {
         if (hud != null) {
             hud.cancel();
         }
+        ScheduledTask rig = session.cameraRigTask();
+        if (rig != null) {
+            rig.cancel();
+            session.cameraRigTask(null);
+        }
     }
 
     private void restorePlayer(PossessionSession session, ReleaseReason reason, Location vesselLocation) {
@@ -962,6 +976,7 @@ public final class PossessionManager {
         player.setGameMode(state.gameMode());
         player.setInvulnerable(state.invulnerable());
         player.setCollidable(state.collidable());
+        player.setInvisible(state.invisible());
         player.setAffectsSpawning(state.affectsSpawning());
         player.setAllowFlight(state.allowFlight());
         player.setFlySpeed(state.flySpeed());
@@ -982,6 +997,9 @@ public final class PossessionManager {
 
         if (session.usesDirectEntityCamera()) {
             directCameraBridge.reset(player);
+        }
+        if (session.usesCameraRig()) {
+            cameraRigManager.detach(session, player);
         }
         if (player.isInsideVehicle()) {
             player.leaveVehicle();
@@ -1021,6 +1039,9 @@ public final class PossessionManager {
 
         if (session.usesDirectEntityCamera()) {
             directCameraBridge.reset(player);
+        }
+        if (session.usesCameraRig()) {
+            cameraRigManager.detach(session, player);
         }
         if (player.isInsideVehicle()) {
             player.leaveVehicle();
@@ -1134,6 +1155,9 @@ public final class PossessionManager {
             if (Bukkit.isOwnedByCurrentRegion(player) && player.isOnline()) {
                 if (session.usesDirectEntityCamera()) {
                     directCameraBridge.reset(player);
+                }
+                if (session.usesCameraRig()) {
+                    cameraRigManager.detach(session, player);
                 }
                 if (player.isInsideVehicle()) {
                     player.leaveVehicle();

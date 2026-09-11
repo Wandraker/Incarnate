@@ -16,11 +16,11 @@ class ConfigMigratorTest {
         user.set("control.release-at-vessel", false);
 
         YamlConfiguration defaults = new YamlConfiguration();
-        defaults.set("config-version", 11);
+        defaults.set("config-version", 12);
         defaults.set("movement.ground.maximum-walk-speed", 0.55);
         defaults.set("abilities.skeleton.cooldown-ticks", 12);
         defaults.set("control.release-at-vessel", true);
-        defaults.set("camera.mode", "DIRECT_ENTITY");
+        defaults.set("camera.mode", "CAMERA_RIG");
         defaults.set("camera.attach-retries", 8);
         defaults.set("vision.warden.enabled", true);
         defaults.set("vision.warden.entity-hard-limit", 12.0);
@@ -30,12 +30,12 @@ class ConfigMigratorTest {
         assertEquals(0.41, user.getDouble("movement.ground.maximum-walk-speed"));
         assertEquals(27, user.getInt("abilities.skeleton.cooldown-ticks"));
         assertFalse(user.getBoolean("control.release-at-vessel"));
-        assertEquals("DIRECT_ENTITY", user.getString("camera.mode"));
+        assertEquals("CAMERA_RIG", user.getString("camera.mode"));
         assertEquals(8, user.getInt("camera.attach-retries"));
         assertTrue(user.getBoolean("vision.warden.enabled"));
         assertEquals(12.0, user.getDouble("vision.warden.entity-hard-limit"));
         assertEquals(0.35, user.getDouble("abilities.melee.aim-assist-radius"));
-        assertEquals(11, user.getInt("config-version"));
+        assertEquals(12, user.getInt("config-version"));
     }
 
     @Test
@@ -45,8 +45,8 @@ class ConfigMigratorTest {
         user.set("camera.mode", "SPECTATOR_TARGET");
 
         YamlConfiguration defaults = new YamlConfiguration();
-        defaults.set("config-version", 11);
-        defaults.set("camera.mode", "DIRECT_ENTITY");
+        defaults.set("config-version", 12);
+        defaults.set("camera.mode", "CAMERA_RIG");
 
         assertFalse(ConfigMigrator.mergeMissing(user, defaults));
         assertEquals("SPECTATOR_TARGET", user.getString("camera.mode"));
@@ -59,7 +59,7 @@ class ConfigMigratorTest {
         user.set("excluded-types", java.util.List.of("ENDER_DRAGON", "SHULKER"));
 
         assertTrue(ConfigMigrator.migrateSchema(user, 1));
-        assertEquals(11, user.getInt("config-version"));
+        assertEquals(12, user.getInt("config-version"));
         assertTrue(user.getStringList("excluded-types").isEmpty());
     }
 
@@ -70,7 +70,7 @@ class ConfigMigratorTest {
         user.set("input.gestures.sneak-primary", false);
 
         assertTrue(ConfigMigrator.migrateSchema(user, 2));
-        assertEquals(11, user.getInt("config-version"));
+        assertEquals(12, user.getInt("config-version"));
         assertFalse(user.getBoolean("input.gestures.sneak-primary"));
     }
 
@@ -82,10 +82,21 @@ class ConfigMigratorTest {
         user.set("camera.mount-retries", 13);
 
         assertTrue(ConfigMigrator.migrateSchema(user, 10));
-        assertEquals(11, user.getInt("config-version"));
-        assertEquals("DIRECT_ENTITY", user.getString("camera.mode"));
+        assertEquals(12, user.getInt("config-version"));
+        assertEquals("CAMERA_RIG", user.getString("camera.mode"));
         assertEquals(13, user.getInt("camera.attach-retries"));
         assertFalse(user.contains("camera.mount-retries"));
+    }
+
+    @Test
+    void schemaElevenMovesDirectEntityDefaultToCameraRig() {
+        YamlConfiguration user = new YamlConfiguration();
+        user.set("config-version", 11);
+        user.set("camera.mode", "DIRECT_ENTITY");
+
+        assertTrue(ConfigMigrator.migrateSchema(user, 11));
+        assertEquals(12, user.getInt("config-version"));
+        assertEquals("CAMERA_RIG", user.getString("camera.mode"));
     }
 
     @Test
@@ -95,7 +106,7 @@ class ConfigMigratorTest {
         user.set("excluded-types", java.util.List.of("ENDER_DRAGON", "SHULKER", "WARDEN"));
 
         assertTrue(ConfigMigrator.migrateSchema(user, 1));
-        assertEquals(11, user.getInt("config-version"));
+        assertEquals(12, user.getInt("config-version"));
         assertEquals(java.util.List.of("ENDER_DRAGON", "SHULKER", "WARDEN"), user.getStringList("excluded-types"));
     }
 }
