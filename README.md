@@ -102,24 +102,22 @@ Existing possession keeps the same Mob UUID and preserves its equipment/state. C
 
 Ender Dragon and Shulker now use dedicated complex-body controllers and are enabled by default. They can still be disabled through `excluded-types`.
 
-### Free-look camera
+### Native entity camera
 
-The default camera transport remains the mounted free-look architecture introduced in 0.3.0.
+The default camera transport is now `DIRECT_ENTITY`. The controller remains a real Adventure-mode Player for normal vanilla input, but the server camera is bound directly to the real controlled Mob instead of mounting the Player as a passenger.
 
-Instead of directly attaching the client camera to the Mob through `setSpectatorTarget`, the hidden controller is moved to the vessel and mounted on the real Mob while remaining its own camera. Mounted possession now uses a real Adventure controller rather than a Spectator controller so vanilla can deliver ordinary swap-offhand (`F`) and sprint input. Incarnate isolates that controller from world gameplay with invulnerability, collision/spawn suppression and event-level interaction guards.
+Incarnate uses the vanilla server `ServerPlayer#setCamera` path through a reflection bridge. This keeps the server aware of the camera target rather than faking only the client view. The hidden controller is moved to the vessel during acquisition, world interaction remains isolated, and positional Player movement is frozen while look/input updates continue driving the Mob.
 
 ```yaml
 camera:
-  mode: MOUNTED
-  mount-retries: 8
+  mode: DIRECT_ENTITY
+  attach-retries: 8
   fallback-to-spectator-target: false
 ```
 
-`SPECTATOR_TARGET` remains available as a legacy compatibility fallback, but the fresh default no longer falls back to it automatically because true Spectator mode suppresses some vanilla input used by Incarnate. Mounted acquisition uses Player and Mob EntitySchedulers and retries region-safe attachment before falling back or releasing safely.
+Because the actual camera entity is the Mob, first person uses the Mob's native camera/eye position and vanilla F5 remains available. In third person the client should render the real Mob body rather than a seated hidden Player. Vanilla still owns third-person distance and collision clipping, so very large/complex bodies such as Ender Dragon require live tuning before their F5 presentation can be called final.
 
-Dismount input is guarded during possession, and release/quit/death/plugin-disable paths explicitly detach the hidden Player before state restoration or recovery teleportation.
-
-The mounted camera still requires live client testing across representative mob sizes and server implementations before being considered gameplay-final.
+`MOUNTED` and `SPECTATOR_TARGET` remain explicit legacy modes for diagnosis/compatibility. They are not the fresh default. True Spectator remains unsuitable for the primary path because it suppresses vanilla inputs that Incarnate uses.
 
 ### Possession HUD
 

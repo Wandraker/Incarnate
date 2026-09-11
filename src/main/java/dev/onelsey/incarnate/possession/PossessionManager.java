@@ -54,8 +54,9 @@ public final class PossessionManager {
     private final boolean removeOrphanedCreated;
     private final boolean releaseAtVessel;
     private final CameraTransport cameraMode;
-    private final int cameraMountRetries;
+    private final int cameraAttachRetries;
     private final boolean cameraFallbackToSpectatorTarget;
+    private final DirectCameraBridge directCameraBridge;
     private final boolean hudEnabled;
     private final int hudIntervalTicks;
     private final boolean hudShowHealth;
@@ -88,14 +89,15 @@ public final class PossessionManager {
         this.releaseAtVessel = plugin.getConfig().getBoolean("control.release-at-vessel", true);
         CameraTransport configuredCamera;
         try {
-            configuredCamera = CameraTransport.valueOf(plugin.getConfig().getString("camera.mode", "MOUNTED").toUpperCase(java.util.Locale.ROOT));
+            configuredCamera = CameraTransport.valueOf(plugin.getConfig().getString("camera.mode", "DIRECT_ENTITY").toUpperCase(java.util.Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            plugin.getLogger().warning("Unknown camera.mode; using MOUNTED.");
-            configuredCamera = CameraTransport.MOUNTED;
+            plugin.getLogger().warning("Unknown camera.mode; using DIRECT_ENTITY.");
+            configuredCamera = CameraTransport.DIRECT_ENTITY;
         }
-        this.cameraMode = configuredCamera == CameraTransport.NONE ? CameraTransport.MOUNTED : configuredCamera;
-        this.cameraMountRetries = Math.max(1, plugin.getConfig().getInt("camera.mount-retries", 8));
-        this.cameraFallbackToSpectatorTarget = plugin.getConfig().getBoolean("camera.fallback-to-spectator-target", true);
+        this.cameraMode = configuredCamera == CameraTransport.NONE ? CameraTransport.DIRECT_ENTITY : configuredCamera;
+        this.cameraAttachRetries = Math.max(1, plugin.getConfig().getInt("camera.attach-retries", 8));
+        this.cameraFallbackToSpectatorTarget = plugin.getConfig().getBoolean("camera.fallback-to-spectator-target", false);
+        this.directCameraBridge = new DirectCameraBridge(plugin);
         this.hudEnabled = plugin.getConfig().getBoolean("hud.actionbar.enabled", true);
         this.hudIntervalTicks = Math.max(1, plugin.getConfig().getInt("hud.actionbar.interval-ticks", 4));
         this.hudShowHealth = plugin.getConfig().getBoolean("hud.actionbar.show-health", true);
@@ -317,8 +319,10 @@ public final class PossessionManager {
 
             if (cameraMode == CameraTransport.SPECTATOR_TARGET) {
                 attachSpectatorTargetCamera(session, false);
-            } else {
+            } else if (cameraMode == CameraTransport.MOUNTED) {
                 attachMountedCamera(session);
+            } else {
+                attachDirectEntityCamera(session, 0);
             }
         }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
         if (attachTask == null) {
@@ -341,6 +345,94 @@ public final class PossessionManager {
         player.setInvulnerable(true);
         player.setCollidable(false);
         player.setAffectsSpawning(false);
+    }
+
+    private void attachDirectEntityCamera(PossessionSession session, int attempt) {
+        Player player = session.player();
+        Location destination = session.lastKnownVesselLocation();
+        if (destination == null) {
+            handleDirectCameraFailure(session, "camera-reason.no-position");
+            return;
+        }
+
+        ViewSnapshot view = session.view();
+        destination.setYaw(view.yaw());
+        destination.setPitch(view.pitch());
+        session.cameraTeleportInProgress(true);
+
+        player.teleportAsync(destination).whenComplete((success, error) -> {
+            ScheduledTask settleTask = player.getScheduler().run(plugin, task -> {
+                session.cameraTeleportInProgress(false);
+                if (!session.isActive() || !player.isOnline()) {
+                    return;
+                }
+                if (error != null || !Boolean.TRUE.equals(success)) {
+                    handleDirectCameraFailure(session, "camera-reason.move-failed");
+                    return;
+                }
+                finishDirectEntityCameraAttach(session, attempt);
+            }, () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)));
+            if (settleTask == null && session.isActive()) {
+                session.cameraTeleportInProgress(false);
+                requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+            }
+        });
+    }
+
+    private void finishDirectEntityCameraAttach(PossessionSession session, int attempt) {
+        Player player = session.player();
+        Mob vessel = session.vessel();
+        if (!session.isActive() || !player.isOnline() || !vessel.isValid() || vessel.isDead()) {
+            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+            return;
+        }
+
+        if (!Bukkit.isOwnedByCurrentRegion(vessel)) {
+            retryDirectEntityCamera(session, attempt);
+            return;
+        }
+
+        session.cameraTeleportInProgress(true);
+        boolean attached;
+        try {
+            attached = directCameraBridge.attach(player, vessel);
+        } finally {
+            session.cameraTeleportInProgress(false);
+        }
+        if (!attached) {
+            handleDirectCameraFailure(session, "camera-reason.direct-bridge-failed");
+            return;
+        }
+
+        session.cameraTransport(CameraTransport.DIRECT_ENTITY);
+        sendAcquiredMessage(session, "direct-entity");
+    }
+
+    private void retryDirectEntityCamera(PossessionSession session, int attempt) {
+        if (attempt + 1 >= cameraAttachRetries) {
+            handleDirectCameraFailure(session, "camera-reason.region-join-failed");
+            return;
+        }
+        Player player = session.player();
+        ScheduledTask retry = player.getScheduler().runDelayed(
+            plugin,
+            task -> attachDirectEntityCamera(session, attempt + 1),
+            () -> deferFromRetired(() -> requestRelease(session, ReleaseReason.VESSEL_REMOVED)),
+            1L
+        );
+        if (retry == null && session.isActive()) {
+            requestRelease(session, ReleaseReason.VESSEL_REMOVED);
+        }
+    }
+
+    private void handleDirectCameraFailure(PossessionSession session, String reasonKey) {
+        if (!session.isActive()) {
+            return;
+        }
+        notifyPlayer(session.player(), "camera-direct-failed", Map.of(
+            "reason", messages.render(session.player(), reasonKey)
+        ));
+        requestRelease(session, ReleaseReason.INTERNAL_ERROR);
     }
 
     private void attachMountedCamera(PossessionSession session) {
@@ -426,7 +518,7 @@ public final class PossessionManager {
     }
 
     private void retryMountedCamera(PossessionSession session, int attempt) {
-        if (attempt + 1 >= cameraMountRetries) {
+        if (attempt + 1 >= cameraAttachRetries) {
             handleMountedCameraFailure(session, "camera-reason.region-join-failed");
             return;
         }
@@ -821,6 +913,9 @@ public final class PossessionManager {
                 return;
             }
 
+            if (session.usesDirectEntityCamera()) {
+                directCameraBridge.reset(player);
+            }
             if (player.isInsideVehicle()) {
                 player.leaveVehicle();
             }
@@ -885,6 +980,9 @@ public final class PossessionManager {
         visibility.forget(session.playerId());
         cancelTasks(session);
 
+        if (session.usesDirectEntityCamera()) {
+            directCameraBridge.reset(player);
+        }
         if (player.isInsideVehicle()) {
             player.leaveVehicle();
         }
@@ -921,6 +1019,9 @@ public final class PossessionManager {
         byVessel.remove(session.vesselId(), session);
         cancelTasks(session);
 
+        if (session.usesDirectEntityCamera()) {
+            directCameraBridge.reset(player);
+        }
         if (player.isInsideVehicle()) {
             player.leaveVehicle();
         }
@@ -1031,6 +1132,9 @@ public final class PossessionManager {
 
             Player player = session.player();
             if (Bukkit.isOwnedByCurrentRegion(player) && player.isOnline()) {
+                if (session.usesDirectEntityCamera()) {
+                    directCameraBridge.reset(player);
+                }
                 if (player.isInsideVehicle()) {
                     player.leaveVehicle();
                 }

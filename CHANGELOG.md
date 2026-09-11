@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0-dev.7 - Native Entity Camera
+
+- Replaces the default passenger-based camera with a direct vanilla entity camera while keeping the controller in real Adventure mode, preserving the working `F`, `Shift + F`, sprint and ordinary input path from dev.6.
+- Uses the server's native `ServerPlayer#setCamera` path through a reflection bridge instead of a client-only fake camera packet, so the server remains aware of the active camera target for normal entity/chunk tracking.
+- Removes the visible/physical passenger requirement from the default possession flow. The hidden controller is positioned at acquisition, then positional movement is frozen while yaw/pitch input remains available to steer the vessel.
+- Vanilla F5 perspective switching is intentionally left client-native. Because the camera entity is the real Mob, third person should render the controlled body rather than the hidden Player; giant/complex bodies such as Ender Dragon remain a live-test target because vanilla owns third-person distance and clipping.
+- Keeps `MOUNTED` and `SPECTATOR_TARGET` only as explicit legacy camera modes. Fresh configs use `DIRECT_ENTITY`, and schema 10's former default `MOUNTED` is migrated to `DIRECT_ENTITY`.
+- Renames `camera.mount-retries` to `camera.attach-retries` and advances the gameplay config schema to 11.
+
 ## 0.9.0-dev.6 - Adventure Controller Isolation
 
 - Replaces the mounted possession foundation with a real server-side Adventure controller instead of keeping the server in Spectator and spoofing a client-only game mode.

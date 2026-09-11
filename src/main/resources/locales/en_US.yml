@@ -34,6 +34,7 @@ messages:
   vessel-disappeared: '<prefix> <warning>The vessel disappeared before possession started.</warning>'
   camera-fallback: '<prefix> <warning>Free-look camera could not attach.</warning> <muted><reason></muted> <secondary>Using legacy camera fallback.</secondary>'
   camera-attach-failed: '<prefix> <error>Could not attach the free-look camera safely.</error>'
+  camera-direct-failed: '<prefix> <error>Could not attach the native vessel camera safely.</error> <muted><reason></muted>'
   acquired: '<prefix> <success>Vessel acquired.</success> <muted>Camera:</muted> <secondary><camera></secondary> <dark_gray>•</dark_gray> <muted>Left click:</muted> <accent><primary_action></accent> <dark_gray>•</dark_gray> <muted>F:</muted> <accent><secondary_action></accent> <dark_gray>•</dark_gray> <muted>Shift+F:</muted> <text>release</text>'
   ability-primary-failed: '<prefix> <error>This vessel primary ability failed.</error> <muted>Possession remains active.</muted>'
   ability-secondary-failed: '<prefix> <error>This vessel secondary ability failed.</error> <muted>Possession remains active.</muted>'
@@ -73,7 +74,8 @@ messages:
       front-left: 'front-left'
 
   camera:
-    mounted-free-look: 'mounted free-look'
+    direct-entity: 'native entity camera'
+    mounted-free-look: 'legacy mounted free-look'
     legacy-spectator-fallback: 'legacy spectator fallback'
     spectator-target: 'spectator target'
   camera-reason:
@@ -81,6 +83,7 @@ messages:
     move-failed: 'The controller could not be moved to the vessel safely.'
     other-vehicle: 'The controller entered another vehicle while the camera was attaching.'
     region-join-failed: 'The controller and vessel could not be joined on a safe entity region.'
+    direct-bridge-failed: 'The server could not bind the native camera to the vessel.'
 
   ability:
     dragon-fireball: 'dragon fireball'

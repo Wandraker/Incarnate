@@ -193,6 +193,7 @@ public final class PossessionSession {
 
     public CameraTransport cameraTransport() { return cameraTransport; }
     public void cameraTransport(CameraTransport cameraTransport) { this.cameraTransport = cameraTransport; }
+    public boolean usesDirectEntityCamera() { return cameraTransport == CameraTransport.DIRECT_ENTITY; }
     public boolean usesMountedCamera() { return cameraTransport == CameraTransport.MOUNTED; }
     public boolean usesSpectatorTargetCamera() { return cameraTransport == CameraTransport.SPECTATOR_TARGET; }
     public boolean cameraTeleportInProgress() { return cameraTeleportInProgress; }

@@ -120,6 +120,23 @@ public final class SessionListener implements Listener {
         event.setCancelled(true);
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onDirectCameraControllerMove(PlayerMoveEvent event) {
+        PossessionSession session = possessions.session(event.getPlayer());
+        if (session == null || !session.isActive() || !session.usesDirectEntityCamera() || event.getTo() == null) {
+            return;
+        }
+        org.bukkit.Location from = event.getFrom();
+        org.bukkit.Location to = event.getTo();
+        if (from.getX() == to.getX() && from.getY() == to.getY() && from.getZ() == to.getZ()) {
+            return;
+        }
+        org.bukkit.Location locked = from.clone();
+        locked.setYaw(to.getYaw());
+        locked.setPitch(to.getPitch());
+        event.setTo(locked);
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onView(PlayerMoveEvent event) {
         if (event.getTo() == null || !possessions.isPossessing(event.getPlayer())) {

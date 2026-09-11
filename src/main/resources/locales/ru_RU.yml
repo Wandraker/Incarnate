@@ -34,6 +34,7 @@ messages:
   vessel-disappeared: '<prefix> <warning>Тело исчезло до завершения вселения.</warning>'
   camera-fallback: '<prefix> <warning>Свободную камеру не удалось подключить.</warning> <muted><reason></muted> <secondary>Используется резервная старая камера.</secondary>'
   camera-attach-failed: '<prefix> <error>Не удалось безопасно подключить свободную камеру.</error>'
+  camera-direct-failed: '<prefix> <error>Не удалось безопасно подключить камеру тела.</error> <muted><reason></muted>'
   acquired: '<prefix> <success>Тело захвачено.</success> <muted>Камера:</muted> <secondary><camera></secondary> <dark_gray>•</dark_gray> <muted>ЛКМ:</muted> <accent><primary_action></accent> <dark_gray>•</dark_gray> <muted>F:</muted> <accent><secondary_action></accent> <dark_gray>•</dark_gray> <muted>Shift+F:</muted> <text>выход</text>'
   ability-primary-failed: '<prefix> <error>Основная способность тела дала ошибку.</error> <muted>Вселение остаётся активным.</muted>'
   ability-secondary-failed: '<prefix> <error>Вторичная способность тела дала ошибку.</error> <muted>Вселение остаётся активным.</muted>'
@@ -73,7 +74,8 @@ messages:
       front-left: 'слева-впереди'
 
   camera:
-    mounted-free-look: 'свободная камера'
+    direct-entity: 'камера от лица сущности'
+    mounted-free-look: 'старая камера с посадкой'
     legacy-spectator-fallback: 'резервная spectator-камера'
     spectator-target: 'spectator-камера'
   camera-reason:
@@ -81,6 +83,7 @@ messages:
     move-failed: 'Не удалось безопасно переместить контроллера к телу.'
     other-vehicle: 'Во время подключения камеры игрок оказался на другом транспорте.'
     region-join-failed: 'Не удалось безопасно объединить игрока и тело в одном регионе сущностей.'
+    direct-bridge-failed: 'Сервер не смог привязать нативную камеру к телу.'
 
   ability:
     dragon-fireball: 'дыхание дракона'

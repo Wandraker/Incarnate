@@ -1,12 +1,12 @@
-config-version: 10
+config-version: 11
 
 control:
   max-possession-distance: 8.0
   release-at-vessel: true
 
 camera:
-  mode: MOUNTED
-  mount-retries: 8
+  mode: DIRECT_ENTITY
+  attach-retries: 8
   fallback-to-spectator-target: false
 
 hud:

@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 public final class ConfigMigrator {
-    private static final int CURRENT_SCHEMA = 10;
+    private static final int CURRENT_SCHEMA = 11;
 
     private ConfigMigrator() {
     }
@@ -59,6 +59,18 @@ public final class ConfigMigrator {
         if (sourceSchema < 10 && target.contains("camera.mounted-client-game-mode")) {
             target.set("camera.mounted-client-game-mode", null);
             changed = true;
+        }
+        if (sourceSchema < 11) {
+            String cameraMode = target.getString("camera.mode");
+            if (cameraMode != null && cameraMode.equalsIgnoreCase("MOUNTED")) {
+                target.set("camera.mode", "DIRECT_ENTITY");
+                changed = true;
+            }
+            if (target.contains("camera.mount-retries")) {
+                target.set("camera.attach-retries", target.getInt("camera.mount-retries", 8));
+                target.set("camera.mount-retries", null);
+                changed = true;
+            }
         }
         if (target.getInt("config-version", 0) != CURRENT_SCHEMA) {
             target.set("config-version", CURRENT_SCHEMA);

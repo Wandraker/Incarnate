@@ -45,8 +45,10 @@ class MessageResourcesTest {
         assertEquals(1, messages.getInt("config-version"));
 
         YamlConfiguration config = load("src/main/resources/config.yml");
-        assertEquals(10, config.getInt("config-version"));
+        assertEquals(11, config.getInt("config-version"));
         assertTrue(!config.contains("camera.mounted-client-game-mode"));
+        assertEquals("DIRECT_ENTITY", config.getString("camera.mode"));
+        assertEquals(8, config.getInt("camera.attach-retries"));
         assertTrue(!config.getBoolean("camera.fallback-to-spectator-target"));
         assertTrue(config.getBoolean("vision.warden.enabled"));
         assertEquals(12.0, config.getDouble("vision.warden.entity-hard-limit"));
