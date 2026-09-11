@@ -39,7 +39,7 @@ jobs:
   paper-smoke:
     needs: compile
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -77,6 +77,13 @@ jobs:
           test -n "$PAPER_URL"
           curl -fsSL -H "User-Agent: ${USER_AGENT}" -o paper.jar "$PAPER_URL"
 
+      - name: Download ProtocolLib 26.2 development build
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL -o ProtocolLib.jar 'https://github.com/dmulloy2/ProtocolLib/releases/download/dev-build/ProtocolLib.jar'
+          test -s ProtocolLib.jar
+
       - name: Verify Paper startup and shutdown lifecycle
         shell: bash
         run: |
@@ -86,6 +93,7 @@ jobs:
           test -f "$PLUGIN_JAR"
 
           mkdir -p ci-server/plugins
+          cp ProtocolLib.jar ci-server/plugins/ProtocolLib.jar
           cp "$PLUGIN_JAR" ci-server/plugins/Incarnate.jar
           cp paper.jar ci-server/paper.jar
           printf 'eula=true\n' > ci-server/eula.txt
@@ -110,9 +118,10 @@ jobs:
           trap cleanup EXIT
 
           READY=0
-          for _ in $(seq 1 100); do
+          for _ in $(seq 1 120); do
             if grep -Eq 'Done \([^)]*\)! For help, type "help"' paper-smoke.log 2>/dev/null \
-              && grep -Fq "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log 2>/dev/null; then
+              && grep -Fq "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log 2>/dev/null \
+              && grep -Eq 'Enabling ProtocolLib|ProtocolLib.*enabled' paper-smoke.log 2>/dev/null; then
               READY=1
               break
             fi
@@ -125,7 +134,7 @@ jobs:
           done
 
           if [ "$READY" -ne 1 ]; then
-            echo 'Timed out waiting for Paper and Incarnate startup.'
+            echo 'Timed out waiting for Paper, ProtocolLib and Incarnate startup.'
             cat paper-smoke.log || true
             exit 1
           fi
@@ -155,7 +164,7 @@ jobs:
           grep -F "Incarnate ${PLUGIN_VERSION} enabled for Minecraft 26.2+" paper-smoke.log
           grep -F "Disabling Incarnate v${PLUGIN_VERSION}" paper-smoke.log
 
-          if grep -E 'Error occurred while enabling Incarnate|Error occurred while disabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate|IllegalPluginAccessException' paper-smoke.log; then
+          if grep -E 'Error occurred while enabling Incarnate|Error occurred while disabling Incarnate|Could not load.*Incarnate|Exception.*Incarnate|IllegalPluginAccessException|NoClassDefFoundError.*protocol' paper-smoke.log; then
             exit 1
           fi
 
