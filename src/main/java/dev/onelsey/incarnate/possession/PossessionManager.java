@@ -930,6 +930,9 @@ public final class PossessionManager {
             if (session.usesDirectEntityCamera()) {
                 directCameraBridge.reset(player);
             }
+            if (session.usesCameraRig()) {
+                cameraRigManager.detach(session, player);
+            }
             if (player.isInsideVehicle()) {
                 player.leaveVehicle();
             }
