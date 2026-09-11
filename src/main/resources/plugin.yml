@@ -1,10 +1,11 @@
 name: Incarnate
-version: 0.9.0-dev.11
+version: 0.9.0-dev.12
 main: dev.onelsey.incarnate.IncarnatePlugin
 api-version: '26.2'
 authors: [Onelsey]
 description: True mob incarnation and possession using real server entities and native abilities.
 folia-supported: true
+depend: [ProtocolLib]
 commands:
   incarnate:
     description: Create a real mob body, trigger abilities, or inspect a controlled vessel.
