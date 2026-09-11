@@ -1,0 +1,59 @@
+name: Apply Incarnate 0.9 sonic target refinement
+
+on:
+  push:
+    branches:
+      - dev/0.9.0-warden-mob-expansion
+    paths:
+      - .github/workflows/dev-apply-090-sonic-target.yml
+      - .github/scripts/apply_090_sonic_target.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.6.1'
+
+      - name: Apply source refinement
+        run: python3 .github/scripts/apply_090_sonic_target.py
+
+      - name: Verify Java 25 build
+        run: gradle clean test classes --stacktrace --warning-mode all
+
+      - name: Commit source changes only
+        shell: bash
+        run: |
+          git config user.name Onelsey
+          git config user.email 103017546+Wandraker@users.noreply.github.com
+          git add build.gradle.kts \
+            CHANGELOG.md \
+            src/main/resources/plugin.yml \
+            src/main/resources/locales/en_US.yml \
+            src/main/resources/locales/ru_RU.yml \
+            src/main/java/dev/onelsey/incarnate/sense/WardenSenseSnapshot.java \
+            src/main/java/dev/onelsey/incarnate/possession/PossessionSession.java \
+            src/main/java/dev/onelsey/incarnate/possession/PossessionManager.java \
+            src/main/java/dev/onelsey/incarnate/listener/SessionListener.java \
+            src/main/java/dev/onelsey/incarnate/ability/AbilityRegistry.java \
+            src/test/java/dev/onelsey/incarnate/sense/WardenSenseMathTest.java \
+            src/test/java/dev/onelsey/incarnate/message/MessageResourcesTest.java
+          git commit -m "Refine Warden sonic target memory"
+          git push origin HEAD:dev/0.9.0-warden-mob-expansion
