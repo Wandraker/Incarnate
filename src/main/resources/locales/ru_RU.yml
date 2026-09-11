@@ -49,6 +49,7 @@ messages:
     ready: '<success>ГОТОВО</success>'
     cooldown: '<warning><seconds>с</warning>'
     unavailable: '<muted>—</muted>'
+    no-target: '<muted>НЕТ ЦЕЛИ</muted>'
     separator: ' <dark_gray>•</dark_gray> '
     sense: '<secondary>◈</secondary> <accent><sense_kind></accent> <muted><sense_direction></muted> <text><sense_distance>м</text>'
 
@@ -104,6 +105,8 @@ messages:
     dash: 'ускорение'
     roar: 'рёв'
     fangs: 'клыки'
+    ghast-fireball: 'огненный шар гаста'
+    sonic-boom: 'звуковой удар'
 
   origin:
     created: 'создано Incarnate'

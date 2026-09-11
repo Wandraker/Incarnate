@@ -493,7 +493,7 @@ public final class PossessionManager {
                     "primary_action", messages.abilityLabel(player, session.primaryAbilityKey()),
                     "secondary_action", messages.abilityLabel(player, session.secondaryAbilityKey()),
                     "primary_state", cooldownState(player, session.primaryAbilityKey(), session.primaryCooldownRemainingTicks()),
-                    "secondary_state", cooldownState(player, session.secondaryAbilityKey(), session.secondaryCooldownRemainingTicks())
+                    "secondary_state", secondaryCooldownState(player, session)
                 ));
             }
 
@@ -536,6 +536,17 @@ public final class PossessionManager {
             "sense_direction", messages.render(player, "sense.direction." + direction),
             "sense_distance", Component.text(formatHudNumber(distance))
         ));
+    }
+
+    private Component secondaryCooldownState(Player player, PossessionSession session) {
+        int remainingTicks = session.secondaryCooldownRemainingTicks();
+        if (remainingTicks <= 0
+            && session.vesselType() == EntityType.WARDEN
+            && "sonic-boom".equals(session.secondaryAbilityKey())
+            && session.activeWardenSonicTargetId() == null) {
+            return messages.render(player, "hud.no-target");
+        }
+        return cooldownState(player, session.secondaryAbilityKey(), remainingTicks);
     }
 
     private Component cooldownState(Player player, String abilityKey, int remainingTicks) {
@@ -653,7 +664,8 @@ public final class PossessionManager {
         double z,
         String eventKey,
         int eventRadius,
-        UUID sourceId
+        UUID sourceId,
+        UUID sonicTargetId
     ) {
         if (!wardenSensesEnabled || eventRadius <= 0) {
             return;
@@ -677,7 +689,14 @@ public final class PossessionManager {
             if (position.distanceSquared(x, y, z) > rangeSquared) {
                 continue;
             }
-            session.recordWardenSense(worldId, x, y, z, kind, eventKey, sourceId, wardenSenseMemoryTicks);
+            UUID safeSonicTargetId = sonicTargetId;
+            if (safeSonicTargetId != null
+                && (safeSonicTargetId.equals(session.playerId()) || safeSonicTargetId.equals(session.vesselId()))) {
+                safeSonicTargetId = null;
+            }
+            session.recordWardenSense(
+                worldId, x, y, z, kind, eventKey, sourceId, safeSonicTargetId, wardenSenseMemoryTicks
+            );
         }
     }
 

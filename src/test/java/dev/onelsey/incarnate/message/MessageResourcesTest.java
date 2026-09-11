@@ -52,6 +52,16 @@ class MessageResourcesTest {
     }
 
     @Test
+    void wardenAndGhastAbilityPresentationIsBundled() {
+        for (String locale : Set.of("en_US", "ru_RU")) {
+            YamlConfiguration localized = load("src/main/resources/locales/" + locale + ".yml");
+            assertNotNull(localized.getString("messages.ability.ghast-fireball"));
+            assertNotNull(localized.getString("messages.ability.sonic-boom"));
+            assertNotNull(localized.getString("messages.hud.no-target"));
+        }
+    }
+
+    @Test
     void bundledMiniMessageTemplatesParse() {
         YamlConfiguration settings = load("src/main/resources/messages.yml");
         for (String locale : Set.of("en_US", "ru_RU")) {

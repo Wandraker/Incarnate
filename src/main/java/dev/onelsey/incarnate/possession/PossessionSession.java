@@ -121,9 +121,31 @@ public final class PossessionSession {
 
     public VesselPositionSnapshot vesselPosition() { return vesselPosition; }
 
-    public void recordWardenSense(UUID worldId, double x, double y, double z, String kind, String eventKey, UUID sourceId, int memoryTicks) {
+    public synchronized void recordWardenSense(
+        UUID worldId,
+        double x,
+        double y,
+        double z,
+        String kind,
+        String eventKey,
+        UUID sourceId,
+        UUID sonicTargetId,
+        int memoryTicks
+    ) {
         long expires = controlTick + Math.max(1, memoryTicks);
-        this.wardenSense = new WardenSenseSnapshot(worldId, x, y, z, kind, eventKey, sourceId, expires);
+        UUID candidate = sonicTargetId;
+        long candidateExpires = sonicTargetId == null ? Long.MIN_VALUE : expires;
+        WardenSenseSnapshot previous = this.wardenSense;
+        if (candidate == null && previous != null) {
+            UUID previousCandidate = previous.activeSonicTarget(controlTick);
+            if (previousCandidate != null) {
+                candidate = previousCandidate;
+                candidateExpires = previous.sonicTargetExpiresAfterTick();
+            }
+        }
+        this.wardenSense = new WardenSenseSnapshot(
+            worldId, x, y, z, kind, eventKey, sourceId, candidate, candidateExpires, expires
+        );
     }
 
     public WardenSenseSnapshot activeWardenSense() {
@@ -136,6 +158,30 @@ public final class PossessionSession {
 
     public void clearWardenSense() {
         this.wardenSense = null;
+    }
+
+    public UUID activeWardenSonicTargetId() {
+        WardenSenseSnapshot snapshot = wardenSense;
+        return snapshot == null ? null : snapshot.activeSonicTarget(controlTick);
+    }
+
+    public synchronized void clearWardenSonicTargetCandidate() {
+        WardenSenseSnapshot snapshot = wardenSense;
+        if (snapshot == null || snapshot.sonicTargetId() == null) {
+            return;
+        }
+        wardenSense = new WardenSenseSnapshot(
+            snapshot.worldId(),
+            snapshot.x(),
+            snapshot.y(),
+            snapshot.z(),
+            snapshot.kind(),
+            snapshot.eventKey(),
+            snapshot.sourceId(),
+            null,
+            Long.MIN_VALUE,
+            snapshot.expiresAfterTick()
+        );
     }
 
     public ScheduledTask controlTask() { return controlTask; }

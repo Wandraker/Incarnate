@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0-dev.3 - Warden Sonic Target Memory
+
+- Separates the latest Warden HUD vibration from the most recent living entity that can actually be used as a sonic-boom target.
+- Unrelated block/action vibrations no longer erase a still-valid sonic target; the target keeps its original sense expiry instead of being refreshed by unrelated noise.
+- Projectile vibrations can resolve to their living shooter when both entities are safely owned by the current Folia region.
+- Consumes the sensed target when sonic charging starts and clears stale/invalid candidates fail-closed.
+- Shows a localized `NO TARGET` state instead of `READY` when Warden sonic boom has no recent living target.
+- Adds the missing English/Russian labels for Ghast fireball and Warden sonic boom.
+
+## 0.9.0-dev.2 - Warden Sonic & Ghast Fidelity
+
+- Adds controlled Warden sonic boom without mutating Warden anger or Brain state. The attack uses the real `SONIC_BOOM` damage type, charge/boom sounds, particles and knockback resistance.
+- Adds a native-feeling Ghast attack sequence: charging state, warning sound, delayed real `LargeFireball`, explosion power and shoot sound.
+- Persists/restores pre-possession Ghast charging state through normal and interrupted-session recovery.
+- Advances the gameplay configuration schema to 7 non-destructively.
+
 ## 0.8.1-alpha.4 - Spectator Secondary Input
 
 - Restores the swap-offhand (`F`) input path while the hidden possession controller is in spectator mode.

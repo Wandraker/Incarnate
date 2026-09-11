@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class WardenSenseMathTest {
@@ -33,9 +34,20 @@ final class WardenSenseMathTest {
     @Test
     void senseSnapshotExpiresOnControlTicks() {
         WardenSenseSnapshot snapshot = new WardenSenseSnapshot(
-            UUID.randomUUID(), 1.0, 2.0, 3.0, "movement", "step", null, 42L
+            UUID.randomUUID(), 1.0, 2.0, 3.0, "movement", "step", null, null, Long.MIN_VALUE, 42L
         );
         assertTrue(snapshot.isActive(42L));
         assertFalse(snapshot.isActive(43L));
+    }
+
+    @Test
+    void sonicTargetExpiryIsIndependentFromLatestHudVibration() {
+        UUID targetId = UUID.randomUUID();
+        WardenSenseSnapshot snapshot = new WardenSenseSnapshot(
+            UUID.randomUUID(), 1.0, 2.0, 3.0, "block", "block_destroy", null, targetId, 42L, 60L
+        );
+        assertEquals(targetId, snapshot.activeSonicTarget(42L));
+        assertNull(snapshot.activeSonicTarget(43L));
+        assertTrue(snapshot.isActive(60L));
     }
 }

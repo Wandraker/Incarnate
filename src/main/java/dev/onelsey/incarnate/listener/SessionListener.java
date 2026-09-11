@@ -19,8 +19,10 @@ import io.papermc.paper.event.player.PlayerUntrackEntityEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Tag;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -41,6 +43,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.event.world.GenericGameEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.projectiles.ProjectileSource;
 
 import java.util.concurrent.TimeUnit;
 
@@ -261,11 +264,20 @@ public final class SessionListener implements Listener {
 
         Entity source = event.getEntity();
         java.util.UUID sourceId = null;
+        java.util.UUID sonicTargetId = null;
         if (source != null && Bukkit.isOwnedByCurrentRegion(source)) {
             if (source.isSneaking() && Tag.GAME_EVENT_IGNORE_VIBRATIONS_SNEAKING.isTagged(event.getEvent())) {
                 return;
             }
             sourceId = source.getUniqueId();
+            if (source instanceof LivingEntity living) {
+                sonicTargetId = living.getUniqueId();
+            } else if (source instanceof Projectile projectile) {
+                ProjectileSource shooter = projectile.getShooter();
+                if (shooter instanceof LivingEntity living && Bukkit.isOwnedByCurrentRegion(living)) {
+                    sonicTargetId = living.getUniqueId();
+                }
+            }
         }
 
         org.bukkit.Location location = event.getLocation();
@@ -276,7 +288,8 @@ public final class SessionListener implements Listener {
             location.getZ(),
             event.getEvent().getKey().getKey(),
             event.getRadius(),
-            sourceId
+            sourceId,
+            sonicTargetId
         );
     }
 

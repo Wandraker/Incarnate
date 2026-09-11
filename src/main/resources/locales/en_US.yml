@@ -49,6 +49,7 @@ messages:
     ready: '<success>READY</success>'
     cooldown: '<warning><seconds>s</warning>'
     unavailable: '<muted>—</muted>'
+    no-target: '<muted>NO TARGET</muted>'
     separator: ' <dark_gray>•</dark_gray> '
     sense: '<secondary>◈</secondary> <accent><sense_kind></accent> <muted><sense_direction></muted> <text><sense_distance>m</text>'
 
@@ -104,6 +105,8 @@ messages:
     dash: 'dash'
     roar: 'roar'
     fangs: 'fangs'
+    ghast-fireball: 'ghast fireball'
+    sonic-boom: 'sonic boom'
 
   origin:
     created: 'created'

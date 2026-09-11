@@ -502,12 +502,12 @@ public final class AbilityRegistry {
         if (session.wardenSonicTracked()) {
             return false;
         }
-        var sense = session.activeWardenSense();
-        if (sense == null || sense.sourceId() == null) {
+        UUID targetId = session.activeWardenSonicTargetId();
+        if (targetId == null) {
             return false;
         }
 
-        Entity rawTarget = Bukkit.getEntity(sense.sourceId());
+        Entity rawTarget = Bukkit.getEntity(targetId);
         if (!(rawTarget instanceof LivingEntity target)
             || !Bukkit.isOwnedByCurrentRegion(target)
             || !target.isValid()
@@ -515,11 +515,15 @@ public final class AbilityRegistry {
             || target.getUniqueId().equals(session.playerId())
             || target.getUniqueId().equals(session.vesselId())
             || target.getWorld() != warden.getWorld()
-            || warden.getEyeLocation().distanceSquared(target.getEyeLocation()) > wardenSonicRange * wardenSonicRange
-            || !session.acquireSecondaryCooldown(Math.max(wardenSonicCooldownTicks, wardenSonicChargeTicks))) {
+            || warden.getEyeLocation().distanceSquared(target.getEyeLocation()) > wardenSonicRange * wardenSonicRange) {
+            session.clearWardenSonicTargetCandidate();
+            return false;
+        }
+        if (!session.acquireSecondaryCooldown(Math.max(wardenSonicCooldownTicks, wardenSonicChargeTicks))) {
             return false;
         }
 
+        session.clearWardenSonicTargetCandidate();
         session.startWardenSonic(target.getUniqueId(), wardenSonicChargeTicks);
         session.lockMovementControl(wardenSonicChargeTicks + 2);
         warden.setVelocity(new Vector());
