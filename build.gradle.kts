@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "dev.onelsey"
-version = "0.9.0-dev.11"
+version = "0.9.0-dev.12"
 
 repositories {
     mavenCentral()
@@ -16,6 +16,7 @@ repositories {
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.2.build.121-stable")
     compileOnly("io.netty:netty-transport:4.2.15.Final")
+    compileOnly("net.dmulloy2:ProtocolLib:5.4.0")
 
     testImplementation("io.papermc.paper:paper-api:26.2.build.121-stable")
     testImplementation("io.netty:netty-transport:4.2.15.Final")
