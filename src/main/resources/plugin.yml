@@ -1,5 +1,5 @@
 name: Incarnate
-version: 0.9.0-dev.12
+version: 0.9.0-dev.13
 main: dev.onelsey.incarnate.IncarnatePlugin
 api-version: '26.2'
 authors: [Onelsey]

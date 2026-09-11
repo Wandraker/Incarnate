@@ -18,6 +18,14 @@ camera:
     body-offset-scale: 0.85
     body-offset-minimum: 0.50
     body-offset-maximum: 1.50
+    protocol:
+      pairing-retry-interval-ticks: 5
+      pairing-max-attempts: 8
+      interpolate-position-sync: true
+      interpolation-max-distance: 1.75
+      interpolation-max-yaw-step: 40.0
+      interpolation-max-pitch-step: 40.0
+      max-reported-velocity: 1.50
     adaptive-third-person-distance: true
     third-person-base: 2.5
     third-person-body-scale: 1.35

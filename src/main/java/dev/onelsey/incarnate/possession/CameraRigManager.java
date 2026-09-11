@@ -45,6 +45,7 @@ public final class CameraRigManager {
     private final ProtocolManager protocol;
     private final PacketAdapter outgoingListener;
     private final PacketAdapter incomingListener;
+    private final PacketType positionSyncPacket;
     private final Set<PacketType> movementPackets;
     private final ConcurrentMap<UUID, PacketSession> sessions = new ConcurrentHashMap<>();
 
@@ -67,6 +68,11 @@ public final class CameraRigManager {
     private final double thirdPersonMaximum;
     private final int pairingRetryIntervalTicks;
     private final int pairingMaxAttempts;
+    private final boolean interpolatePositionSync;
+    private final double interpolationMaxDistance;
+    private final double interpolationMaxYawStep;
+    private final double interpolationMaxPitchStep;
+    private final double maxReportedVelocity;
 
     private final Method getPositionMoveRotationMethod;
     private final Method createPositionMoveRotationMethod;
@@ -94,6 +100,19 @@ public final class CameraRigManager {
         this.thirdPersonMaximum = Math.max(this.thirdPersonMinimum, plugin.getConfig().getDouble("camera.presentation.third-person-maximum", 32.0));
         this.pairingRetryIntervalTicks = Math.max(1, plugin.getConfig().getInt("camera.presentation.protocol.pairing-retry-interval-ticks", 5));
         this.pairingMaxAttempts = Math.max(1, plugin.getConfig().getInt("camera.presentation.protocol.pairing-max-attempts", 8));
+        this.interpolatePositionSync = plugin.getConfig().getBoolean("camera.presentation.protocol.interpolate-position-sync", true);
+        this.interpolationMaxDistance = Math.max(0.05, plugin.getConfig().getDouble("camera.presentation.protocol.interpolation-max-distance", 1.75));
+        this.interpolationMaxYawStep = clamp(
+            plugin.getConfig().getDouble("camera.presentation.protocol.interpolation-max-yaw-step", 40.0),
+            0.0,
+            180.0
+        );
+        this.interpolationMaxPitchStep = clamp(
+            plugin.getConfig().getDouble("camera.presentation.protocol.interpolation-max-pitch-step", 40.0),
+            0.0,
+            180.0
+        );
+        this.maxReportedVelocity = Math.max(0.0, plugin.getConfig().getDouble("camera.presentation.protocol.max-reported-velocity", 1.50));
 
         try {
             this.getPositionMoveRotationMethod = PacketContainer.class.getMethod("getPositionMoveRotation");
@@ -116,6 +135,13 @@ public final class CameraRigManager {
             );
         }
 
+        this.positionSyncPacket = optionalServerPacket("ENTITY_POSITION_SYNC").orElseThrow(() ->
+            new IllegalStateException(
+                "Incarnate requires the current ProtocolLib development build with Minecraft 26.2 ENTITY_POSITION_SYNC support."
+            )
+        );
+        validatePositionSyncPacket();
+
         Set<PacketType> movement = new HashSet<>();
         movement.add(PacketType.Play.Server.REL_ENTITY_MOVE);
         movement.add(PacketType.Play.Server.REL_ENTITY_MOVE_LOOK);
@@ -123,7 +149,7 @@ public final class CameraRigManager {
         movement.add(PacketType.Play.Server.ENTITY_HEAD_ROTATION);
         movement.add(PacketType.Play.Server.ENTITY_TELEPORT);
         movement.add(PacketType.Play.Server.ENTITY_VELOCITY);
-        optionalServerPacket("ENTITY_POSITION_SYNC").ifPresent(movement::add);
+        movement.add(positionSyncPacket);
         this.movementPackets = Set.copyOf(movement);
 
         List<PacketType> outgoingTypes = new ArrayList<>();
@@ -315,7 +341,7 @@ public final class CameraRigManager {
             PresentationTarget target = state.presentationTarget.get();
             if (target != null) {
                 try {
-                    sendTransform(player, state.virtualEntityId, target);
+                    sendTransform(player, state, target);
                 } catch (RuntimeException ex) {
                     markBroken(state, "virtual body transform failed", ex);
                 }
@@ -426,6 +452,7 @@ public final class CameraRigManager {
         }
         packet.getIntLists().write(0, rewritten);
         state.spawned.set(false);
+        state.lastSentTarget.set(null);
     }
 
     private void rewriteSpawn(PacketContainer packet, PacketSession state) {
@@ -434,6 +461,7 @@ public final class CameraRigManager {
             packet.getUUIDs().write(0, state.virtualEntityUuid);
         }
         if (target == null) {
+            state.lastSentTarget.set(null);
             return;
         }
         if (packet.getDoubles().size() >= 3) {
@@ -457,6 +485,7 @@ public final class CameraRigManager {
         if (bytes.size() > 2) {
             bytes.write(2, yaw);
         }
+        state.lastSentTarget.set(target);
     }
 
     private void suppressVirtualInteraction(PacketEvent event) {
@@ -548,30 +577,82 @@ public final class CameraRigManager {
         });
     }
 
-    private void sendTransform(Player player, int virtualEntityId, PresentationTarget target) {
-        PacketContainer teleport = protocol.createPacket(PacketType.Play.Server.ENTITY_TELEPORT);
-        teleport.getIntegers().write(0, virtualEntityId);
-        writePositionMoveRotation(teleport, target);
-        if (teleport.getBooleans().size() > 0) {
-            teleport.getBooleans().write(0, false);
+    private void sendTransform(Player player, PacketSession state, PresentationTarget target) {
+        PresentationTarget previous = state.lastSentTarget.getAndSet(target);
+        boolean interpolate = interpolatePositionSync && canInterpolate(previous, target);
+        Vector deltaMovement = interpolate ? reportedMotion(previous, target) : new Vector();
+        PacketType movementType = interpolate ? positionSyncPacket : PacketType.Play.Server.ENTITY_TELEPORT;
+
+        PacketContainer movement = protocol.createPacket(movementType);
+        movement.getIntegers().write(0, state.virtualEntityId);
+        writePositionMoveRotation(movement, target, deltaMovement);
+        if (movement.getBooleans().size() > 0) {
+            movement.getBooleans().write(0, false);
         }
-        protocol.sendServerPacket(player, teleport, false);
+        protocol.sendServerPacket(player, movement, false);
 
         PacketContainer head = protocol.createPacket(PacketType.Play.Server.ENTITY_HEAD_ROTATION);
-        head.getIntegers().write(0, virtualEntityId);
+        head.getIntegers().write(0, state.virtualEntityId);
         if (head.getBytes().size() > 0) {
             head.getBytes().write(0, packedAngle(target.yaw));
         }
         protocol.sendServerPacket(player, head, false);
     }
 
+    private boolean canInterpolate(PresentationTarget previous, PresentationTarget target) {
+        if (previous == null || !previous.worldId.equals(target.worldId)) {
+            return false;
+        }
+        double dx = target.x - previous.x;
+        double dy = target.y - previous.y;
+        double dz = target.z - previous.z;
+        if (dx * dx + dy * dy + dz * dz > interpolationMaxDistance * interpolationMaxDistance) {
+            return false;
+        }
+        if (angleDistance(previous.yaw, target.yaw) > interpolationMaxYawStep) {
+            return false;
+        }
+        return angleDistance(previous.pitch, target.pitch) <= interpolationMaxPitchStep;
+    }
+
+    private Vector reportedMotion(PresentationTarget previous, PresentationTarget target) {
+        if (previous == null || !previous.worldId.equals(target.worldId) || maxReportedVelocity <= 0.0) {
+            return new Vector();
+        }
+        Vector delta = new Vector(
+            target.x - previous.x,
+            target.y - previous.y,
+            target.z - previous.z
+        );
+        return limit(delta, maxReportedVelocity);
+    }
+
+    private void validatePositionSyncPacket() {
+        try {
+            PacketContainer packet = protocol.createPacket(positionSyncPacket);
+            if (packet.getIntegers().size() == 0 || packet.getBooleans().size() == 0) {
+                throw new IllegalStateException("ProtocolLib exposed an incompatible ENTITY_POSITION_SYNC packet layout.");
+            }
+            writePositionMoveRotation(
+                packet,
+                new PresentationTarget(new UUID(0L, 0L), 0.0, 0.0, 0.0, 0.0f, 0.0f),
+                new Vector()
+            );
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException(
+                "Incarnate requires a ProtocolLib development build compatible with Minecraft 26.2 ENTITY_POSITION_SYNC.",
+                ex
+            );
+        }
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void writePositionMoveRotation(PacketContainer packet, PresentationTarget target) {
+    private void writePositionMoveRotation(PacketContainer packet, PresentationTarget target, Vector deltaMovement) {
         try {
             Object wrapper = createPositionMoveRotationMethod.invoke(
                 null,
                 new Vector(target.x, target.y, target.z),
-                new Vector(),
+                deltaMovement,
                 target.yaw,
                 target.pitch
             );
@@ -747,6 +828,16 @@ public final class CameraRigManager {
         return (byte) Math.floor(degrees * 256.0f / 360.0f);
     }
 
+    private static double angleDistance(float from, float to) {
+        double delta = (to - from) % 360.0;
+        if (delta > 180.0) {
+            delta -= 360.0;
+        } else if (delta < -180.0) {
+            delta += 360.0;
+        }
+        return Math.abs(delta);
+    }
+
     private static Vector limit(Vector vector, double maximum) {
         double lengthSquared = vector.lengthSquared();
         double maximumSquared = maximum * maximum;
@@ -767,6 +858,7 @@ public final class CameraRigManager {
         private final UUID virtualEntityUuid;
         private final AtomicReference<VesselSnapshot> vesselSnapshot;
         private final AtomicReference<PresentationTarget> presentationTarget = new AtomicReference<>();
+        private final AtomicReference<PresentationTarget> lastSentTarget = new AtomicReference<>();
         private final AtomicBoolean spawned = new AtomicBoolean(false);
         private final AtomicBoolean broken = new AtomicBoolean(false);
         private final AtomicInteger unpairedTicks = new AtomicInteger();

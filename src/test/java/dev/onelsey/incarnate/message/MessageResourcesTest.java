@@ -57,6 +57,15 @@ class MessageResourcesTest {
         assertTrue(config.getDouble("camera.presentation.max-correction-speed") > 0.0);
         assertTrue(config.getDouble("camera.presentation.body-offset-minimum") >= 0.0);
         assertTrue(config.getDouble("camera.presentation.body-offset-maximum") >= config.getDouble("camera.presentation.body-offset-minimum"));
+        assertEquals(5, config.getInt("camera.presentation.protocol.pairing-retry-interval-ticks"));
+        assertEquals(8, config.getInt("camera.presentation.protocol.pairing-max-attempts"));
+        assertTrue(config.getBoolean("camera.presentation.protocol.interpolate-position-sync"));
+        assertTrue(config.getDouble("camera.presentation.protocol.interpolation-max-distance") > 0.0);
+        assertTrue(config.getDouble("camera.presentation.protocol.interpolation-max-yaw-step") >= 0.0);
+        assertTrue(config.getDouble("camera.presentation.protocol.interpolation-max-yaw-step") <= 180.0);
+        assertTrue(config.getDouble("camera.presentation.protocol.interpolation-max-pitch-step") >= 0.0);
+        assertTrue(config.getDouble("camera.presentation.protocol.interpolation-max-pitch-step") <= 180.0);
+        assertTrue(config.getDouble("camera.presentation.protocol.max-reported-velocity") >= 0.0);
         assertTrue(config.getBoolean("camera.presentation.adaptive-third-person-distance"));
         assertTrue(config.getDouble("camera.presentation.third-person-minimum") > 0.0);
         assertTrue(config.getDouble("camera.presentation.third-person-maximum") >= config.getDouble("camera.presentation.third-person-minimum"));

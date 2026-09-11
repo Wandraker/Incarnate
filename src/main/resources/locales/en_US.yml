@@ -74,7 +74,7 @@ messages:
       front-left: 'front-left'
 
   camera:
-    rig-anchor: 'controller shadow'
+    rig-anchor: 'ProtocolLib packet presentation'
     direct-entity: 'native entity camera'
     mounted-free-look: 'legacy mounted free-look'
     legacy-spectator-fallback: 'legacy spectator fallback'
