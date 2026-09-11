@@ -50,7 +50,9 @@ class MessageResourcesTest {
         assertEquals("CAMERA_RIG", config.getString("camera.mode"));
         assertEquals(8, config.getInt("camera.attach-retries"));
         assertTrue(!config.getBoolean("camera.fallback-to-spectator-target"));
+        assertTrue(config.contains("camera.rig.vertical-offset"));
         assertTrue(config.getBoolean("camera.rig.adaptive-third-person-distance"));
+        assertTrue(config.getDouble("camera.rig.third-person-minimum") > 0.0);
         assertTrue(config.getDouble("camera.rig.third-person-maximum") >= config.getDouble("camera.rig.third-person-minimum"));
         assertTrue(config.getBoolean("vision.warden.enabled"));
         assertEquals(12.0, config.getDouble("vision.warden.entity-hard-limit"));
