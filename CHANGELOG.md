@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0-dev.4 - Runtime Input & Vision Polish
+
+- Fixes spectator `F` decoding against Minecraft 26.2 by using the packet's public action accessor before the compatibility field fallback.
+- Keeps the existing packet/Bukkit secondary-input deduplication and the `F` / `Shift + F` control mapping unchanged.
+- Makes possessed-Warden visual darkness client-stable instead of periodically refreshing a short fake Darkness effect.
+- Suppresses vanilla Warden-caused Darkness updates on the hidden Warden controller while Incarnate's Warden vision is active, preventing the body's own Darkness pulse from fighting the possession vision layer.
+- Adds configurable melee aim assistance through `abilities.melee.aim-assist-radius` so real-mob melee is less pixel-perfect without changing the underlying real `Mob#attack` execution.
+- Advances gameplay config schema to 8 additively; existing server values remain preserved.
+
 ## 0.9.0-dev.3 - Warden Sonic Target Memory
 
 - Separates the latest Warden HUD vibration from the most recent living entity that can actually be used as a sonic-boom target.

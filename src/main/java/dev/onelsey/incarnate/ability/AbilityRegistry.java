@@ -89,6 +89,7 @@ public final class AbilityRegistry {
     private final boolean meleeEnabled;
     private final double meleeRange;
     private final double meleeRaySize;
+    private final double meleeAimAssistRadius;
     private final int meleeCooldownTicks;
     private final boolean endermanTeleportEnabled;
     private final double endermanTeleportDistance;
@@ -185,6 +186,7 @@ public final class AbilityRegistry {
         this.meleeEnabled = config.getBoolean("abilities.melee.enabled", true);
         this.meleeRange = Math.max(1.0, config.getDouble("abilities.melee.range", 3.25));
         this.meleeRaySize = Math.max(0.0, config.getDouble("abilities.melee.ray-size", 0.30));
+        this.meleeAimAssistRadius = Math.max(0.0, config.getDouble("abilities.melee.aim-assist-radius", 0.35));
         this.meleeCooldownTicks = Math.max(1, config.getInt("abilities.melee.cooldown-ticks", 10));
         this.endermanTeleportEnabled = config.getBoolean("abilities.enderman-teleport.enabled", true);
         this.endermanTeleportDistance = Math.max(2.0, config.getDouble("abilities.enderman-teleport.max-distance", 12.0));
@@ -1037,7 +1039,7 @@ public final class AbilityRegistry {
             return false;
         }
 
-        LivingEntity target = findLivingTarget(session, vessel, meleeRange, meleeRaySize);
+        LivingEntity target = findLivingTarget(session, vessel, meleeRange, meleeRaySize + meleeAimAssistRadius);
         if (target == null || !session.acquirePrimaryCooldown(meleeCooldownTicks)) {
             return false;
         }

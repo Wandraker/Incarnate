@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.OptionalInt;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +31,13 @@ class SpectatorPrimaryInputBridgeTest {
     }
 
     @Test
+    void readsPublicPlayerActionAccessorWithoutPrivateFieldAccess() {
+        assertEquals("SWAP_ITEM_WITH_OFFHAND", SpectatorPrimaryInputBridge.playerActionName(
+            new AccessorOnlyPacket(PlayerAction.SWAP_ITEM_WITH_OFFHAND)
+        ));
+    }
+
+    @Test
     void ignoresOtherPlayerActions() {
         assertFalse(SpectatorPrimaryInputBridge.isSwapOffhandAction(
             new ServerboundPlayerActionPacket(PlayerAction.DROP_ITEM)
@@ -52,6 +60,18 @@ class SpectatorPrimaryInputBridgeTest {
     private enum PlayerAction {
         SWAP_ITEM_WITH_OFFHAND,
         DROP_ITEM
+    }
+
+    public static final class AccessorOnlyPacket {
+        private final PlayerAction action;
+
+        private AccessorOnlyPacket(PlayerAction action) {
+            this.action = action;
+        }
+
+        public PlayerAction getAction() {
+            return action;
+        }
     }
 
     private static final class ServerboundPlayerActionPacket {

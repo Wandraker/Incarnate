@@ -1,4 +1,4 @@
-config-version: 7
+config-version: 8
 
 control:
   max-possession-distance: 8.0
@@ -135,6 +135,7 @@ abilities:
     enabled: true
     range: 3.25
     ray-size: 0.30
+    aim-assist-radius: 0.35
     cooldown-ticks: 10
   enderman-teleport:
     enabled: true

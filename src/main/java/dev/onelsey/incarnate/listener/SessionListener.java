@@ -30,6 +30,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.entity.EntityRemoveEvent;
+import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerInputEvent;
@@ -44,6 +45,7 @@ import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.event.world.GenericGameEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.concurrent.TimeUnit;
 
@@ -254,6 +256,19 @@ public final class SessionListener implements Listener {
             return AbilityGesture.SPRINT_PRIMARY;
         }
         return AbilityGesture.PRIMARY;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPotionEffect(EntityPotionEffectEvent event) {
+        if (!(event.getEntity() instanceof Player player)
+            || event.getCause() != EntityPotionEffectEvent.Cause.WARDEN
+            || event.getModifiedType() != PotionEffectType.DARKNESS) {
+            return;
+        }
+        PossessionSession session = possessions.session(player);
+        if (session != null && session.isActive() && wardenVision.suppressesNativeDarkness(session)) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

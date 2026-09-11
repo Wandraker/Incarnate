@@ -212,6 +212,26 @@ public final class SpectatorPrimaryInputBridge implements Listener {
         if (packet == null || !PLAYER_ACTION_PACKET_SIMPLE_NAME.equals(packet.getClass().getSimpleName())) {
             return false;
         }
+        return SWAP_OFFHAND_ACTION.equals(playerActionName(packet));
+    }
+
+    static String playerActionName(Object packet) {
+        if (packet == null) {
+            return null;
+        }
+        for (String accessorName : new String[]{"getAction", "action"}) {
+            try {
+                Method accessor = packet.getClass().getMethod(accessorName);
+                if (!accessor.trySetAccessible()) {
+                    continue;
+                }
+                Object value = accessor.invoke(packet);
+                if (value instanceof Enum<?> action) {
+                    return action.name();
+                }
+            } catch (ReflectiveOperationException | SecurityException ignored) {
+            }
+        }
         for (Class<?> type = packet.getClass(); type != null; type = type.getSuperclass()) {
             for (Field field : type.getDeclaredFields()) {
                 if (!field.getType().isEnum() || !field.trySetAccessible()) {
@@ -219,14 +239,14 @@ public final class SpectatorPrimaryInputBridge implements Listener {
                 }
                 try {
                     Object value = field.get(packet);
-                    if (value instanceof Enum<?> action && SWAP_OFFHAND_ACTION.equals(action.name())) {
-                        return true;
+                    if (value instanceof Enum<?> action) {
+                        return action.name();
                     }
                 } catch (IllegalAccessException ignored) {
                 }
             }
         }
-        return false;
+        return null;
     }
 
     private void removeHandler(Channel channel) {

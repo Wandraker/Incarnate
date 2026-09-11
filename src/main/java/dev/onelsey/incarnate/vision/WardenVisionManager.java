@@ -24,8 +24,6 @@ public final class WardenVisionManager {
     private final double pruneDistance;
     private final int evaluationIntervalTicks;
     private final boolean visualDarkness;
-    private final int visualRefreshTicks;
-    private final int visualEffectDurationTicks;
     private final Map<UUID, VisionState> states = new ConcurrentHashMap<>();
 
     public WardenVisionManager(IncarnatePlugin plugin) {
@@ -35,8 +33,6 @@ public final class WardenVisionManager {
         this.pruneDistance = Math.max(entityHardLimit + 32.0, plugin.getConfig().getDouble("vision.warden.watch-prune-distance", 256.0));
         this.evaluationIntervalTicks = Math.max(1, plugin.getConfig().getInt("vision.warden.evaluation-interval-ticks", 2));
         this.visualDarkness = plugin.getConfig().getBoolean("vision.warden.visual-darkness", true);
-        this.visualRefreshTicks = Math.max(20, plugin.getConfig().getInt("vision.warden.visual-refresh-ticks", 100));
-        this.visualEffectDurationTicks = Math.max(40, visualRefreshTicks + 40);
     }
 
     public void ensureActive(PossessionSession session) {
@@ -69,11 +65,6 @@ public final class WardenVisionManager {
                 task.cancel();
                 removeState(playerId, state, session.player().isOnline());
                 return;
-            }
-            state.guardTicks += 5;
-            if (visualDarkness && state.guardTicks >= visualRefreshTicks) {
-                state.guardTicks = 0;
-                applyVisualDarkness(session.player());
             }
         }, () -> states.remove(playerId, state), 1L, 5L);
         state.guardTask = guard;
@@ -120,6 +111,10 @@ public final class WardenVisionManager {
         if (!target.appliedHidden.get() && !target.desiredHidden.get()) {
             removeTarget(state, target, false);
         }
+    }
+
+    public boolean suppressesNativeDarkness(PossessionSession session) {
+        return visualDarkness && applies(session);
     }
 
     public void deactivate(Player player, boolean restoreClient) {
@@ -362,7 +357,7 @@ public final class WardenVisionManager {
     private void applyVisualDarkness(Player player) {
         PotionEffect effect = new PotionEffect(
             PotionEffectType.DARKNESS,
-            visualEffectDurationTicks,
+            PotionEffect.INFINITE_DURATION,
             0,
             false,
             false,
@@ -384,7 +379,6 @@ public final class WardenVisionManager {
         private final PossessionSession session;
         private final Map<UUID, TargetState> targets = new ConcurrentHashMap<>();
         private volatile ScheduledTask guardTask;
-        private int guardTicks;
 
         private VisionState(PossessionSession session) {
             this.session = session;
