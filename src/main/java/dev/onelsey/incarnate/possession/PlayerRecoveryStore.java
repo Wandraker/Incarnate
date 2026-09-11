@@ -5,9 +5,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
-import org.bukkit.Pose;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 

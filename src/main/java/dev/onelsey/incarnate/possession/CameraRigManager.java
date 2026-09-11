@@ -7,7 +7,6 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
-import org.bukkit.Pose;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -17,6 +16,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.util.Vector;
@@ -100,11 +100,18 @@ public final class CameraRigManager {
         applyThirdPersonDistance(player, session);
         player.hideEntity(plugin, vessel);
 
+        Location lastKnown = session.lastKnownVesselLocation();
+        if (lastKnown == null || lastKnown.getWorld() == null) {
+            clearThirdPersonDistance(player);
+            player.showEntity(plugin, vessel);
+            return false;
+        }
+
         VesselCameraSnapshot initial = new VesselCameraSnapshot(
             vessel.getWorld().getUID(),
-            session.lastKnownVesselLocation().getX(),
-            session.lastKnownVesselLocation().getY(),
-            session.lastKnownVesselLocation().getZ(),
+            lastKnown.getX(),
+            lastKnown.getY(),
+            lastKnown.getZ(),
             session.vesselEyeHeight(),
             session.vesselWidth(),
             session.vesselHeight(),
@@ -287,6 +294,7 @@ public final class CameraRigManager {
 
             Location spawn = vessel.getLocation().clone();
             if (!proxy.spawnAt(spawn, CreatureSpawnEvent.SpawnReason.CUSTOM)) {
+                proxy.remove();
                 fail(session);
                 return;
             }
@@ -371,7 +379,7 @@ public final class CameraRigManager {
         if (world == null) {
             return null;
         }
-        Location target = new Location(
+        return new Location(
             world,
             snapshot.x(),
             snapshot.y() + snapshot.eyeHeight() - player.getEyeHeight() + verticalOffset,
@@ -379,7 +387,6 @@ public final class CameraRigManager {
             player.getYaw(),
             player.getPitch()
         );
-        return target;
     }
 
     private Location presentationDestination(CameraSnapshot camera, VesselCameraSnapshot vessel) {

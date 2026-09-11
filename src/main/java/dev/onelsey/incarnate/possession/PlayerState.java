@@ -2,8 +2,8 @@ package dev.onelsey.incarnate.possession;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
-import org.bukkit.Pose;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
 
 public record PlayerState(
     GameMode gameMode,
