@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 public final class ConfigMigrator {
-    private static final int CURRENT_SCHEMA = 12;
+    private static final int CURRENT_SCHEMA = 13;
 
     private ConfigMigrator() {
     }
@@ -76,6 +76,41 @@ public final class ConfigMigrator {
             String cameraMode = target.getString("camera.mode");
             if (cameraMode != null && cameraMode.equalsIgnoreCase("DIRECT_ENTITY")) {
                 target.set("camera.mode", "CAMERA_RIG");
+                changed = true;
+            }
+        }
+        if (sourceSchema < 13) {
+            String cameraMode = target.getString("camera.mode");
+            if (cameraMode != null && cameraMode.equalsIgnoreCase("CAMERA_RIG")) {
+                target.set("camera.mode", "CONTROLLER_SHADOW");
+                changed = true;
+            }
+            if (target.contains("camera.rig.vertical-offset")) {
+                target.set("camera.shadow.vertical-offset", target.getDouble("camera.rig.vertical-offset"));
+                changed = true;
+            }
+            if (target.contains("camera.rig.adaptive-third-person-distance")) {
+                target.set("camera.shadow.adaptive-third-person-distance", target.getBoolean("camera.rig.adaptive-third-person-distance"));
+                changed = true;
+            }
+            if (target.contains("camera.rig.third-person-base")) {
+                target.set("camera.shadow.third-person-base", target.getDouble("camera.rig.third-person-base"));
+                changed = true;
+            }
+            if (target.contains("camera.rig.third-person-body-scale")) {
+                target.set("camera.shadow.third-person-body-scale", target.getDouble("camera.rig.third-person-body-scale"));
+                changed = true;
+            }
+            if (target.contains("camera.rig.third-person-minimum")) {
+                target.set("camera.shadow.third-person-minimum", target.getDouble("camera.rig.third-person-minimum"));
+                changed = true;
+            }
+            if (target.contains("camera.rig.third-person-maximum")) {
+                target.set("camera.shadow.third-person-maximum", target.getDouble("camera.rig.third-person-maximum"));
+                changed = true;
+            }
+            if (target.contains("camera.rig")) {
+                target.set("camera.rig", null);
                 changed = true;
             }
         }

@@ -1,15 +1,18 @@
-config-version: 12
+config-version: 13
 
 control:
   max-possession-distance: 8.0
   release-at-vessel: true
 
 camera:
-  mode: CAMERA_RIG
+  mode: CONTROLLER_SHADOW
   attach-retries: 8
   fallback-to-spectator-target: false
-  rig:
+  shadow:
     vertical-offset: 0.0
+    hard-snap-distance: 1.25
+    correction-gain: 0.65
+    max-correction-speed: 0.35
     adaptive-third-person-distance: true
     third-person-base: 2.5
     third-person-body-scale: 1.35

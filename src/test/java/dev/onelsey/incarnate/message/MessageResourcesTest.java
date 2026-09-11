@@ -45,15 +45,19 @@ class MessageResourcesTest {
         assertEquals(1, messages.getInt("config-version"));
 
         YamlConfiguration config = load("src/main/resources/config.yml");
-        assertEquals(12, config.getInt("config-version"));
+        assertEquals(13, config.getInt("config-version"));
         assertTrue(!config.contains("camera.mounted-client-game-mode"));
-        assertEquals("CAMERA_RIG", config.getString("camera.mode"));
+        assertEquals("CONTROLLER_SHADOW", config.getString("camera.mode"));
         assertEquals(8, config.getInt("camera.attach-retries"));
         assertTrue(!config.getBoolean("camera.fallback-to-spectator-target"));
-        assertTrue(config.contains("camera.rig.vertical-offset"));
-        assertTrue(config.getBoolean("camera.rig.adaptive-third-person-distance"));
-        assertTrue(config.getDouble("camera.rig.third-person-minimum") > 0.0);
-        assertTrue(config.getDouble("camera.rig.third-person-maximum") >= config.getDouble("camera.rig.third-person-minimum"));
+        assertTrue(config.contains("camera.shadow.vertical-offset"));
+        assertTrue(config.getDouble("camera.shadow.hard-snap-distance") >= 0.25);
+        assertTrue(config.getDouble("camera.shadow.correction-gain") >= 0.0);
+        assertTrue(config.getDouble("camera.shadow.correction-gain") <= 1.0);
+        assertTrue(config.getDouble("camera.shadow.max-correction-speed") > 0.0);
+        assertTrue(config.getBoolean("camera.shadow.adaptive-third-person-distance"));
+        assertTrue(config.getDouble("camera.shadow.third-person-minimum") > 0.0);
+        assertTrue(config.getDouble("camera.shadow.third-person-maximum") >= config.getDouble("camera.shadow.third-person-minimum"));
         assertTrue(config.getBoolean("vision.warden.enabled"));
         assertEquals(12.0, config.getDouble("vision.warden.entity-hard-limit"));
         assertTrue(config.getInt("vision.warden.evaluation-interval-ticks") >= 1);

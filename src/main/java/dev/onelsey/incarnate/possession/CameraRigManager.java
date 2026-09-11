@@ -8,35 +8,44 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
-import org.bukkit.entity.ArmorStand;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public final class CameraRigManager {
     private final IncarnatePlugin plugin;
     private final Consumer<PossessionSession> failureHandler;
     private final NamespacedKey cameraDistanceKey;
+    private final NamespacedKey legacyCameraDistanceKey;
     private final double verticalOffset;
+    private final double hardSnapDistance;
+    private final double correctionGain;
+    private final double maxCorrectionSpeed;
     private final boolean adaptiveThirdPersonDistance;
     private final double thirdPersonBase;
     private final double thirdPersonBodyScale;
     private final double thirdPersonMinimum;
     private final double thirdPersonMaximum;
+    private final Map<UUID, Location> lastTargets = new ConcurrentHashMap<>();
 
     public CameraRigManager(IncarnatePlugin plugin, Consumer<PossessionSession> failureHandler) {
         this.plugin = plugin;
         this.failureHandler = failureHandler;
-        this.cameraDistanceKey = new NamespacedKey(plugin, "camera_rig_distance");
-        this.verticalOffset = plugin.getConfig().getDouble("camera.rig.vertical-offset", 0.0);
-        this.adaptiveThirdPersonDistance = plugin.getConfig().getBoolean("camera.rig.adaptive-third-person-distance", true);
-        this.thirdPersonBase = plugin.getConfig().getDouble("camera.rig.third-person-base", 2.5);
-        this.thirdPersonBodyScale = plugin.getConfig().getDouble("camera.rig.third-person-body-scale", 1.35);
-        this.thirdPersonMinimum = Math.max(1.0, plugin.getConfig().getDouble("camera.rig.third-person-minimum", 4.0));
-        this.thirdPersonMaximum = Math.max(this.thirdPersonMinimum, plugin.getConfig().getDouble("camera.rig.third-person-maximum", 32.0));
+        this.cameraDistanceKey = new NamespacedKey(plugin, "camera_shadow_distance");
+        this.legacyCameraDistanceKey = new NamespacedKey(plugin, "camera_rig_distance");
+        this.verticalOffset = plugin.getConfig().getDouble("camera.shadow.vertical-offset", 0.0);
+        this.hardSnapDistance = Math.max(0.25, plugin.getConfig().getDouble("camera.shadow.hard-snap-distance", 1.25));
+        this.correctionGain = clamp(plugin.getConfig().getDouble("camera.shadow.correction-gain", 0.65), 0.0, 1.0);
+        this.maxCorrectionSpeed = Math.max(0.01, plugin.getConfig().getDouble("camera.shadow.max-correction-speed", 0.35));
+        this.adaptiveThirdPersonDistance = plugin.getConfig().getBoolean("camera.shadow.adaptive-third-person-distance", true);
+        this.thirdPersonBase = plugin.getConfig().getDouble("camera.shadow.third-person-base", 2.5);
+        this.thirdPersonBodyScale = plugin.getConfig().getDouble("camera.shadow.third-person-body-scale", 1.35);
+        this.thirdPersonMinimum = Math.max(1.0, plugin.getConfig().getDouble("camera.shadow.third-person-minimum", 4.0));
+        this.thirdPersonMaximum = Math.max(this.thirdPersonMinimum, plugin.getConfig().getDouble("camera.shadow.third-person-maximum", 32.0));
     }
 
     public boolean attach(PossessionSession session) {
@@ -45,30 +54,27 @@ public final class CameraRigManager {
             return false;
         }
 
-        ArmorStand rig;
-        try {
-            Entity spawned = player.getWorld().spawnEntity(player.getLocation(), EntityType.ARMOR_STAND);
-            if (!(spawned instanceof ArmorStand armorStand)) {
-                spawned.remove();
-                return false;
-            }
-            rig = armorStand;
-            configureRig(rig);
-        } catch (RuntimeException ex) {
-            plugin.getLogger().log(java.util.logging.Level.WARNING, "Could not create Incarnate camera rig", ex);
-            return false;
-        }
-
-        if (!rig.addPassenger(player)) {
-            rig.remove();
-            return false;
-        }
-
-        session.cameraRigId(rig.getUniqueId());
+        session.cameraRigId(null);
         session.cameraTransport(CameraTransport.CAMERA_RIG);
+        session.endCameraRigTeleport();
+        prepareController(player);
         applyThirdPersonDistance(player, session);
 
-        ScheduledTask task = rig.getScheduler().runAtFixedRate(plugin, ignored -> tick(session, rig), () -> fail(session), 1L, 1L);
+        Location target = destination(session, player);
+        if (target == null) {
+            clearThirdPersonDistance(player);
+            return false;
+        }
+        lastTargets.put(session.playerId(), target.clone());
+        snapToTarget(session, player, target);
+
+        ScheduledTask task = player.getScheduler().runAtFixedRate(
+            plugin,
+            ignored -> tick(session),
+            () -> fail(session),
+            1L,
+            1L
+        );
         session.cameraRigTask(task);
         if (task == null) {
             detach(session, player);
@@ -77,22 +83,18 @@ public final class CameraRigManager {
         return true;
     }
 
-    private static void configureRig(ArmorStand rig) {
-        rig.setVisible(false);
-        rig.setMarker(true);
-        rig.setSmall(true);
-        rig.setBasePlate(false);
-        rig.setArms(false);
-        rig.setGravity(false);
-        rig.setInvulnerable(true);
-        rig.setSilent(true);
-        rig.setPersistent(false);
-        rig.setCollidable(false);
-        rig.setCustomNameVisible(false);
+    private void prepareController(Player player) {
+        player.setAllowFlight(true);
+        player.setFlySpeed(0.0f);
+        if (!player.isFlying()) {
+            player.setFlying(true);
+        }
+        player.setFallDistance(0.0f);
+        player.setVelocity(new Vector());
     }
 
-    private void tick(PossessionSession session, ArmorStand rig) {
-        if (!session.isActive() || !rig.isValid()) {
+    private void tick(PossessionSession session) {
+        if (!session.isActive()) {
             return;
         }
 
@@ -101,53 +103,87 @@ public final class CameraRigManager {
             fail(session);
             return;
         }
-
         if (!Bukkit.isOwnedByCurrentRegion(player)) {
             return;
         }
 
-        if (player.getVehicle() != rig) {
-            if (!rig.addPassenger(player)) {
-                fail(session);
-                return;
-            }
+        prepareController(player);
+        if (session.cameraRigTeleportInProgress()) {
+            return;
         }
 
-        Location destination = destination(session, player);
-        if (destination == null || destination.getWorld() == null || destination.getWorld() != rig.getWorld()) {
+        Location target = destination(session, player);
+        if (target == null || target.getWorld() == null) {
             fail(session);
             return;
         }
 
-        if (Bukkit.isOwnedByCurrentRegion(destination)) {
-            if (!rig.teleport(destination)) {
-                fail(session);
-            }
+        Location current = player.getLocation();
+        Location previousTarget = lastTargets.put(session.playerId(), target.clone());
+        if (current.getWorld() != target.getWorld()) {
+            snapToTarget(session, player, target);
             return;
         }
 
-        if (!session.beginCameraRigTeleport()) {
+        Vector error = target.toVector().subtract(current.toVector());
+        if (error.lengthSquared() >= hardSnapDistance * hardSnapDistance) {
+            snapToTarget(session, player, target);
             return;
         }
 
-        rig.teleportAsync(destination).whenComplete((success, error) -> {
-            session.endCameraRigTeleport();
-            if (error != null || !Boolean.TRUE.equals(success)) {
-                fail(session);
-            }
-        });
+        Vector targetMotion = new Vector();
+        if (previousTarget != null && previousTarget.getWorld() == target.getWorld()) {
+            targetMotion = target.toVector().subtract(previousTarget.toVector());
+        }
+
+        Vector correction = limit(error.multiply(correctionGain), maxCorrectionSpeed);
+        player.setVelocity(targetMotion.add(correction));
     }
 
     private Location destination(PossessionSession session, Player player) {
         Location vessel = session.lastKnownVesselLocation();
-        if (vessel == null) {
+        if (vessel == null || vessel.getWorld() == null) {
             return null;
         }
-        double anchorY = session.vesselEyeHeight() - player.getEyeHeight() + verticalOffset;
-        vessel.add(0.0, anchorY, 0.0);
-        vessel.setYaw(0.0f);
-        vessel.setPitch(0.0f);
+        vessel.add(0.0, session.vesselEyeHeight() - player.getEyeHeight() + verticalOffset, 0.0);
+        vessel.setYaw(player.getYaw());
+        vessel.setPitch(player.getPitch());
         return vessel;
+    }
+
+    private void snapToTarget(PossessionSession session, Player player, Location target) {
+        if (!session.isActive() || !player.isOnline() || !session.beginCameraRigTeleport()) {
+            return;
+        }
+
+        session.cameraTeleportInProgress(true);
+        if (target.getWorld() == player.getWorld() && Bukkit.isOwnedByCurrentRegion(target)) {
+            boolean success;
+            try {
+                success = player.teleport(target);
+            } catch (RuntimeException ex) {
+                success = false;
+                plugin.getLogger().log(java.util.logging.Level.WARNING, "Controller shadow snap failed", ex);
+            } finally {
+                session.cameraTeleportInProgress(false);
+                session.endCameraRigTeleport();
+            }
+            if (!success) {
+                fail(session);
+            }
+            return;
+        }
+
+        player.teleportAsync(target).whenComplete((success, error) -> {
+            session.cameraTeleportInProgress(false);
+            session.endCameraRigTeleport();
+            if (session.isActive() && (error != null || !Boolean.TRUE.equals(success))) {
+                if (error != null) {
+                    plugin.getLogger().log(java.util.logging.Level.WARNING, "Controller shadow async snap failed", error);
+                }
+                fail(session);
+            }
+        });
     }
 
     private void applyThirdPersonDistance(Player player, PossessionSession session) {
@@ -181,7 +217,7 @@ public final class CameraRigManager {
             return;
         }
         for (AttributeModifier modifier : instance.getModifiers()) {
-            if (modifier.getKey().equals(cameraDistanceKey)) {
+            if (modifier.getKey().equals(cameraDistanceKey) || modifier.getKey().equals(legacyCameraDistanceKey)) {
                 instance.removeModifier(modifier);
             }
         }
@@ -194,34 +230,27 @@ public final class CameraRigManager {
             session.cameraRigTask(null);
         }
         session.endCameraRigTeleport();
-        clearThirdPersonDistance(player);
-
-        UUID rigId = session.cameraRigId();
+        session.cameraTeleportInProgress(false);
         session.cameraRigId(null);
-        if (rigId == null) {
-            return;
+        lastTargets.remove(session.playerId());
+        clearThirdPersonDistance(player);
+        if (player.isOnline()) {
+            player.setVelocity(new Vector());
+            player.setFallDistance(0.0f);
         }
-
-        Entity entity = Bukkit.getEntity(rigId);
-        if (entity == null) {
-            return;
-        }
-
-        if (Bukkit.isOwnedByCurrentRegion(entity)) {
-            removeRig(entity, player);
-            return;
-        }
-
-        entity.getScheduler().run(plugin, ignored -> removeRig(entity, player), null);
     }
 
-    private static void removeRig(Entity rig, Player player) {
-        if (player.getVehicle() == rig) {
-            rig.removePassenger(player);
+    private static Vector limit(Vector vector, double maximum) {
+        double lengthSquared = vector.lengthSquared();
+        double maximumSquared = maximum * maximum;
+        if (lengthSquared <= maximumSquared || lengthSquared <= 1.0e-12) {
+            return vector;
         }
-        if (rig.isValid()) {
-            rig.remove();
-        }
+        return vector.multiply(maximum / Math.sqrt(lengthSquared));
+    }
+
+    private static double clamp(double value, double minimum, double maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
     }
 
     private void fail(PossessionSession session) {
