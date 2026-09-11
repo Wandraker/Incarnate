@@ -83,7 +83,10 @@ public final class SessionListener implements Listener {
     public void onGameModeChange(PlayerGameModeChangeEvent event) {
         PossessionSession session = possessions.session(event.getPlayer());
         if (session != null && session.isActive()) {
-            if (event.getNewGameMode() != org.bukkit.GameMode.SPECTATOR) {
+            org.bukkit.GameMode expected = session.usesSpectatorTargetCamera()
+                ? org.bukkit.GameMode.SPECTATOR
+                : org.bukkit.GameMode.ADVENTURE;
+            if (event.getNewGameMode() != expected) {
                 event.setCancelled(true);
                 return;
             }
@@ -223,14 +226,19 @@ public final class SessionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPrimaryInteract(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND) {
+        PossessionSession session = possessions.session(event.getPlayer());
+        if (session == null || !session.isActive()) {
             return;
         }
-        Action action = event.getAction();
-        if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK) {
-            return;
+        if (event.getHand() == EquipmentSlot.HAND) {
+            Action action = event.getAction();
+            if (action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK) {
+                triggerPrimaryFromTransport(event.getPlayer(), PrimaryInputTransport.INTERACT);
+            }
         }
-        triggerPrimaryFromTransport(event.getPlayer(), PrimaryInputTransport.INTERACT);
+        event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+        event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+        event.setCancelled(true);
     }
 
     public void triggerPrimaryFromPacket(Player player) {

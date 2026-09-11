@@ -9,7 +9,10 @@ public record PlayerState(
     Location location,
     float flySpeed,
     boolean allowFlight,
-    boolean flying
+    boolean flying,
+    boolean invulnerable,
+    boolean collidable,
+    boolean affectsSpawning
 ) {
     public static PlayerState capture(Player player) {
         return new PlayerState(
@@ -17,7 +20,10 @@ public record PlayerState(
             player.getLocation().clone(),
             player.getFlySpeed(),
             player.getAllowFlight(),
-            player.isFlying()
+            player.isFlying(),
+            player.isInvulnerable(),
+            player.isCollidable(),
+            player.getAffectsSpawning()
         );
     }
 }

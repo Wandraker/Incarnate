@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.0-dev.6 - Adventure Controller Isolation
+
+- Replaces the mounted possession foundation with a real server-side Adventure controller instead of keeping the server in Spectator and spoofing a client-only game mode.
+- Removes the dev.5 client game-mode packet bridge; mounted `F`, `Shift + F` and sprint input now use normal vanilla Adventure input paths.
+- Adds a controller isolation layer: possessed players are invulnerable, non-collidable, excluded from mob-spawn influence, hidden by the existing visibility system, protected from incoming damage and prevented from directly damaging, breaking, placing, interacting, dropping, picking up, consuming, fishing, launching projectiles or modifying inventories.
+- Prevents mobs from targeting the hidden controller body while possession is active.
+- Extends Player recovery state with the original invulnerability, collision and spawn-influence flags so normal release, quit recovery, restart recovery and plugin shutdown restore the pre-possession state.
+- Keeps `SPECTATOR_TARGET` only as a legacy compatibility camera; new configs default its automatic fallback to disabled because true Spectator mode can suppress Incarnate controls.
+- Removes obsolete `camera.mounted-client-game-mode` during schema migration and advances gameplay config schema to 10.
+
 ## 0.9.0-dev.5 - Mounted Vanilla Input Recovery
 
 - Fixes the root cause of dead `F` / `Shift + F` controls in the default mounted camera: the server still keeps the controller in spectator mode for safety, while the client is presented as Adventure during a successful mounted possession so vanilla emits ordinary swap-offhand and sprint input again.

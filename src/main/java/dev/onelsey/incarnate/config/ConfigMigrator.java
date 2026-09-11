@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 public final class ConfigMigrator {
-    private static final int CURRENT_SCHEMA = 9;
+    private static final int CURRENT_SCHEMA = 10;
 
     private ConfigMigrator() {
     }
@@ -55,6 +55,10 @@ public final class ConfigMigrator {
                 target.set("excluded-types", java.util.List.of());
                 changed = true;
             }
+        }
+        if (sourceSchema < 10 && target.contains("camera.mounted-client-game-mode")) {
+            target.set("camera.mounted-client-game-mode", null);
+            changed = true;
         }
         if (target.getInt("config-version", 0) != CURRENT_SCHEMA) {
             target.set("config-version", CURRENT_SCHEMA);

@@ -8,6 +8,7 @@ import dev.onelsey.incarnate.config.ConfigMigrator;
 import dev.onelsey.incarnate.input.PrimaryInputDeduplicator;
 import dev.onelsey.incarnate.input.SecondaryInputDeduplicator;
 import dev.onelsey.incarnate.input.SpectatorPrimaryInputBridge;
+import dev.onelsey.incarnate.listener.ControllerIsolationListener;
 import dev.onelsey.incarnate.listener.SessionListener;
 import dev.onelsey.incarnate.message.MessageService;
 import dev.onelsey.incarnate.movement.ControllerRegistry;
@@ -65,6 +66,7 @@ public final class IncarnatePlugin extends JavaPlugin {
             wardenVision
         );
         getServer().getPluginManager().registerEvents(sessionListener, this);
+        getServer().getPluginManager().registerEvents(new ControllerIsolationListener(possessions), this);
         spectatorPrimaryInputBridge = new SpectatorPrimaryInputBridge(
             this,
             primaryInputDeduplicator,

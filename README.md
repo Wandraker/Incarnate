@@ -106,16 +106,16 @@ Ender Dragon and Shulker now use dedicated complex-body controllers and are enab
 
 The default camera transport remains the mounted free-look architecture introduced in 0.3.0.
 
-Instead of directly attaching the client camera to the Mob through `setSpectatorTarget`, the hidden spectator Player is moved to the vessel and mounted on the real Mob while remaining its own camera. This is designed to preserve normal mouse/touch yaw and pitch input while the Mob body follows that view direction.
+Instead of directly attaching the client camera to the Mob through `setSpectatorTarget`, the hidden controller is moved to the vessel and mounted on the real Mob while remaining its own camera. Mounted possession now uses a real Adventure controller rather than a Spectator controller so vanilla can deliver ordinary swap-offhand (`F`) and sprint input. Incarnate isolates that controller from world gameplay with invulnerability, collision/spawn suppression and event-level interaction guards.
 
 ```yaml
 camera:
   mode: MOUNTED
   mount-retries: 8
-  fallback-to-spectator-target: true
+  fallback-to-spectator-target: false
 ```
 
-`SPECTATOR_TARGET` remains available as a compatibility fallback. Mounted acquisition uses Player and Mob EntitySchedulers and retries region-safe attachment before falling back or releasing safely.
+`SPECTATOR_TARGET` remains available as a legacy compatibility fallback, but the fresh default no longer falls back to it automatically because true Spectator mode suppresses some vanilla input used by Incarnate. Mounted acquisition uses Player and Mob EntitySchedulers and retries region-safe attachment before falling back or releasing safely.
 
 Dismount input is guarded during possession, and release/quit/death/plugin-disable paths explicitly detach the hidden Player before state restoration or recovery teleportation.
 
@@ -297,7 +297,7 @@ Special-state restoration includes sitting state, Bat awake state, Camel dash, C
 
 On normal release, a pre-possession combat target is restored only when it is still alive and safely owned by the same Folia region.
 
-The Player's original game mode, flight permission/state, fly speed, world, location and rotation are stored for interrupted recovery. Recovery remains pending if the saved world is temporarily unavailable.
+The Player's original game mode, flight permission/state, fly speed, invulnerability, collision state, mob-spawn influence, world, location and rotation are stored for interrupted recovery. Recovery remains pending if the saved world is temporarily unavailable.
 
 ### AI suppression note
 

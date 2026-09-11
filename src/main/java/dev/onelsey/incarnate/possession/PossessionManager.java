@@ -56,7 +56,6 @@ public final class PossessionManager {
     private final CameraTransport cameraMode;
     private final int cameraMountRetries;
     private final boolean cameraFallbackToSpectatorTarget;
-    private final ClientGameModeBridge clientGameModeBridge;
     private final boolean hudEnabled;
     private final int hudIntervalTicks;
     private final boolean hudShowHealth;
@@ -97,7 +96,6 @@ public final class PossessionManager {
         this.cameraMode = configuredCamera == CameraTransport.NONE ? CameraTransport.MOUNTED : configuredCamera;
         this.cameraMountRetries = Math.max(1, plugin.getConfig().getInt("camera.mount-retries", 8));
         this.cameraFallbackToSpectatorTarget = plugin.getConfig().getBoolean("camera.fallback-to-spectator-target", true);
-        this.clientGameModeBridge = new ClientGameModeBridge(plugin);
         this.hudEnabled = plugin.getConfig().getBoolean("hud.actionbar.enabled", true);
         this.hudIntervalTicks = Math.max(1, plugin.getConfig().getInt("hud.actionbar.interval-ticks", 4));
         this.hudShowHealth = plugin.getConfig().getBoolean("hud.actionbar.show-health", true);
@@ -315,11 +313,7 @@ public final class PossessionManager {
             playerRecovery.save(player, session.playerState());
             startInputSampler(session);
             startHud(session);
-            player.setGameMode(GameMode.SPECTATOR);
-            try {
-                player.setSpectatorTarget(null);
-            } catch (IllegalStateException | IllegalArgumentException ignored) {
-            }
+            applyControllerIsolation(player);
 
             if (cameraMode == CameraTransport.SPECTATOR_TARGET) {
                 attachSpectatorTargetCamera(session, false);
@@ -330,6 +324,23 @@ public final class PossessionManager {
         if (attachTask == null) {
             requestRelease(session, ReleaseReason.QUIT);
         }
+    }
+
+    private static void applyControllerIsolation(Player player) {
+        if (player.getGameMode() == GameMode.SPECTATOR) {
+            try {
+                player.setSpectatorTarget(null);
+            } catch (IllegalStateException | IllegalArgumentException ignored) {
+            }
+        }
+        if (player.getGameMode() != GameMode.ADVENTURE) {
+            player.setGameMode(GameMode.ADVENTURE);
+        }
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        player.setInvulnerable(true);
+        player.setCollidable(false);
+        player.setAffectsSpawning(false);
     }
 
     private void attachMountedCamera(PossessionSession session) {
@@ -390,7 +401,6 @@ public final class PossessionManager {
             }
 
             session.cameraTransport(CameraTransport.MOUNTED);
-            clientGameModeBridge.presentMounted(player);
             if (session.vesselType() == EntityType.ENDER_DRAGON) {
                 resyncMountedDragonView(session);
             }
@@ -447,8 +457,10 @@ public final class PossessionManager {
             if (!session.isActive() || !player.isOnline()) {
                 return;
             }
-            clientGameModeBridge.present(player, GameMode.SPECTATOR);
             session.cameraTransport(CameraTransport.SPECTATOR_TARGET);
+            if (player.getGameMode() != GameMode.SPECTATOR) {
+                player.setGameMode(GameMode.SPECTATOR);
+            }
             try {
                 player.setSpectatorTarget(vessel);
             } catch (IllegalStateException | IllegalArgumentException ex) {
@@ -853,10 +865,12 @@ public final class PossessionManager {
 
     private void restorePlayerState(Player player, PlayerState state) {
         player.setGameMode(state.gameMode());
+        player.setInvulnerable(state.invulnerable());
+        player.setCollidable(state.collidable());
+        player.setAffectsSpawning(state.affectsSpawning());
         player.setAllowFlight(state.allowFlight());
         player.setFlySpeed(state.flySpeed());
         player.setFlying(state.allowFlight() && state.flying());
-        clientGameModeBridge.present(player, state.gameMode());
     }
 
     public void releaseOnQuit(Player player) {
