@@ -247,7 +247,15 @@ public final class CameraRigManager {
             return false;
         }
 
-        requestPairing(packetSession, vessel, player);
+        ScheduledTask initialPairing = vessel.getScheduler().run(
+            plugin,
+            ignored -> requestPairing(packetSession, vessel, player),
+            () -> markBroken(packetSession, "initial vessel pairing scheduler retired", null)
+        );
+        if (initialPairing == null) {
+            detach(session, player);
+            return false;
+        }
         return true;
     }
 
@@ -349,7 +357,14 @@ public final class CameraRigManager {
     }
 
     private void requestPairing(PacketSession state, Mob vessel, Player player) {
-        if (!state.session.isActive() || !vessel.isValid() || !player.isOnline()) {
+        if (!state.session.isActive()
+            || sessions.get(state.session.playerId()) != state
+            || !vessel.isValid()
+            || !player.isOnline()) {
+            return;
+        }
+        if (!Bukkit.isOwnedByCurrentRegion(vessel)) {
+            markBroken(state, "ProtocolLib entity pairing escaped vessel-owned region", null);
             return;
         }
         try {
