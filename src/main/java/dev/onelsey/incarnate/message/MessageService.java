@@ -96,7 +96,10 @@ public final class MessageService {
     }
 
     public Component cameraLabel(CommandSender sender, String cameraKey) {
-        return render(sender, "camera." + cameraKey);
+        String normalized = cameraKey != null && cameraKey.startsWith("camera.")
+            ? cameraKey.substring("camera.".length())
+            : cameraKey;
+        return render(sender, "camera." + normalized);
     }
 
     public Component plainValue(Object value) {

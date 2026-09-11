@@ -25,6 +25,11 @@ public final class CameraRigManager {
     private final double hardSnapDistance;
     private final double correctionGain;
     private final double maxCorrectionSpeed;
+    private final boolean selfOcclusionClearance;
+    private final double clearanceBase;
+    private final double clearanceBodyScale;
+    private final double clearanceMinimum;
+    private final double clearanceMaximum;
     private final boolean adaptiveThirdPersonDistance;
     private final double thirdPersonBase;
     private final double thirdPersonBodyScale;
@@ -41,6 +46,11 @@ public final class CameraRigManager {
         this.hardSnapDistance = Math.max(0.25, plugin.getConfig().getDouble("camera.shadow.hard-snap-distance", 1.25));
         this.correctionGain = clamp(plugin.getConfig().getDouble("camera.shadow.correction-gain", 0.65), 0.0, 1.0);
         this.maxCorrectionSpeed = Math.max(0.01, plugin.getConfig().getDouble("camera.shadow.max-correction-speed", 0.35));
+        this.selfOcclusionClearance = plugin.getConfig().getBoolean("camera.shadow.self-occlusion-clearance", true);
+        this.clearanceBase = Math.max(0.0, plugin.getConfig().getDouble("camera.shadow.clearance-base", 0.12));
+        this.clearanceBodyScale = Math.max(0.0, plugin.getConfig().getDouble("camera.shadow.clearance-body-scale", 0.55));
+        this.clearanceMinimum = Math.max(0.0, plugin.getConfig().getDouble("camera.shadow.clearance-minimum", 0.35));
+        this.clearanceMaximum = Math.max(this.clearanceMinimum, plugin.getConfig().getDouble("camera.shadow.clearance-maximum", 1.25));
         this.adaptiveThirdPersonDistance = plugin.getConfig().getBoolean("camera.shadow.adaptive-third-person-distance", true);
         this.thirdPersonBase = plugin.getConfig().getDouble("camera.shadow.third-person-base", 2.5);
         this.thirdPersonBodyScale = plugin.getConfig().getDouble("camera.shadow.third-person-body-scale", 1.35);
@@ -145,10 +155,24 @@ public final class CameraRigManager {
         if (vessel == null || vessel.getWorld() == null) {
             return null;
         }
+
         vessel.add(0.0, session.vesselEyeHeight() - player.getEyeHeight() + verticalOffset, 0.0);
+        if (selfOcclusionClearance) {
+            double clearance = clearanceFor(session);
+            double yawRadians = Math.toRadians(player.getYaw());
+            vessel.add(-Math.sin(yawRadians) * clearance, 0.0, Math.cos(yawRadians) * clearance);
+        }
         vessel.setYaw(player.getYaw());
         vessel.setPitch(player.getPitch());
         return vessel;
+    }
+
+    private double clearanceFor(PossessionSession session) {
+        return clamp(
+            clearanceBase + session.vesselWidth() * clearanceBodyScale,
+            clearanceMinimum,
+            clearanceMaximum
+        );
     }
 
     private void snapToTarget(PossessionSession session, Player player, Location target) {
@@ -198,7 +222,11 @@ public final class CameraRigManager {
         }
 
         double body = Math.max(session.vesselWidth(), session.vesselHeight());
-        double desired = Math.max(thirdPersonMinimum, Math.min(thirdPersonMaximum, thirdPersonBase + body * thirdPersonBodyScale));
+        double desired = Math.max(thirdPersonMinimum, thirdPersonBase + body * thirdPersonBodyScale);
+        if (selfOcclusionClearance) {
+            desired += clearanceFor(session);
+        }
+        desired = Math.min(thirdPersonMaximum, desired);
         double amount = desired - instance.getValue();
         if (Math.abs(amount) < 1.0e-4) {
             return;
