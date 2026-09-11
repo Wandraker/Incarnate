@@ -2,6 +2,7 @@ package dev.onelsey.incarnate.possession;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Pose;
 import org.bukkit.entity.Player;
 
 public record PlayerState(
@@ -13,7 +14,10 @@ public record PlayerState(
     boolean invulnerable,
     boolean collidable,
     boolean invisible,
-    boolean affectsSpawning
+    boolean affectsSpawning,
+    Pose pose,
+    boolean fixedPose,
+    boolean noPhysics
 ) {
     public static PlayerState capture(Player player) {
         return new PlayerState(
@@ -25,7 +29,10 @@ public record PlayerState(
             player.isInvulnerable(),
             player.isCollidable(),
             player.isInvisible(),
-            player.getAffectsSpawning()
+            player.getAffectsSpawning(),
+            player.getPose(),
+            player.hasFixedPose(),
+            player.hasNoPhysics()
         );
     }
 }

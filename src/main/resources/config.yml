@@ -1,18 +1,23 @@
-config-version: 13
+config-version: 14
 
 control:
   max-possession-distance: 8.0
   release-at-vessel: true
 
 camera:
-  mode: CONTROLLER_SHADOW
+  mode: PRESENTATION_PROXY
   attach-retries: 8
   fallback-to-spectator-target: false
-  shadow:
+  presentation:
+    controller-pose: SWIMMING
     vertical-offset: 0.0
     hard-snap-distance: 1.25
-    correction-gain: 0.65
-    max-correction-speed: 0.35
+    correction-gain: 0.75
+    max-correction-speed: 0.45
+    body-offset-base: 0.15
+    body-offset-scale: 0.85
+    body-offset-minimum: 0.50
+    body-offset-maximum: 1.50
     adaptive-third-person-distance: true
     third-person-base: 2.5
     third-person-body-scale: 1.35

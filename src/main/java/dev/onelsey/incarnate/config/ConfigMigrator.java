@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 public final class ConfigMigrator {
-    private static final int CURRENT_SCHEMA = 13;
+    private static final int CURRENT_SCHEMA = 14;
 
     private ConfigMigrator() {
     }
@@ -111,6 +111,13 @@ public final class ConfigMigrator {
             }
             if (target.contains("camera.rig")) {
                 target.set("camera.rig", null);
+                changed = true;
+            }
+        }
+        if (sourceSchema < 14) {
+            String cameraMode = target.getString("camera.mode");
+            if (cameraMode != null && cameraMode.equalsIgnoreCase("CONTROLLER_SHADOW")) {
+                target.set("camera.mode", "PRESENTATION_PROXY");
                 changed = true;
             }
         }

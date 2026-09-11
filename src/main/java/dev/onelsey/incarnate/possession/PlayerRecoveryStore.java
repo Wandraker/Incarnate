@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Pose;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -24,6 +25,9 @@ public final class PlayerRecoveryStore {
     private final NamespacedKey collidableKey;
     private final NamespacedKey invisibleKey;
     private final NamespacedKey affectsSpawningKey;
+    private final NamespacedKey poseKey;
+    private final NamespacedKey fixedPoseKey;
+    private final NamespacedKey noPhysicsKey;
     private final NamespacedKey worldKey;
     private final NamespacedKey xKey;
     private final NamespacedKey yKey;
@@ -42,6 +46,9 @@ public final class PlayerRecoveryStore {
         this.collidableKey = new NamespacedKey(plugin, "recovery_collidable");
         this.invisibleKey = new NamespacedKey(plugin, "recovery_invisible");
         this.affectsSpawningKey = new NamespacedKey(plugin, "recovery_affects_spawning");
+        this.poseKey = new NamespacedKey(plugin, "recovery_pose");
+        this.fixedPoseKey = new NamespacedKey(plugin, "recovery_fixed_pose");
+        this.noPhysicsKey = new NamespacedKey(plugin, "recovery_no_physics");
         this.worldKey = new NamespacedKey(plugin, "recovery_world");
         this.xKey = new NamespacedKey(plugin, "recovery_x");
         this.yKey = new NamespacedKey(plugin, "recovery_y");
@@ -61,6 +68,9 @@ public final class PlayerRecoveryStore {
         data.set(collidableKey, PersistentDataType.BYTE, bool(state.collidable()));
         data.set(invisibleKey, PersistentDataType.BYTE, bool(state.invisible()));
         data.set(affectsSpawningKey, PersistentDataType.BYTE, bool(state.affectsSpawning()));
+        data.set(poseKey, PersistentDataType.STRING, state.pose().name());
+        data.set(fixedPoseKey, PersistentDataType.BYTE, bool(state.fixedPose()));
+        data.set(noPhysicsKey, PersistentDataType.BYTE, bool(state.noPhysics()));
 
         Location location = state.location();
         if (location.getWorld() != null) {
@@ -124,6 +134,9 @@ public final class PlayerRecoveryStore {
         boolean collidable = readBool(data, collidableKey, true);
         boolean invisible = readBool(data, invisibleKey, false);
         boolean affectsSpawning = readBool(data, affectsSpawningKey, true);
+        String rawPose = data.get(poseKey, PersistentDataType.STRING);
+        boolean fixedPose = readBool(data, fixedPoseKey, player.hasFixedPose());
+        boolean noPhysics = readBool(data, noPhysicsKey, player.hasNoPhysics());
         String rawWorld = data.get(worldKey, PersistentDataType.STRING);
         Double x = data.get(xKey, PersistentDataType.DOUBLE);
         Double y = data.get(yKey, PersistentDataType.DOUBLE);
@@ -161,6 +174,13 @@ public final class PlayerRecoveryStore {
         player.setCollidable(collidable);
         player.setInvisible(invisible);
         player.setAffectsSpawning(affectsSpawning);
+        player.setNoPhysics(noPhysics);
+        if (rawPose != null) {
+            try {
+                player.setPose(Pose.valueOf(rawPose), fixedPose);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
         player.setAllowFlight(allowFlight);
         if (flySpeed != null && flySpeed >= -1.0f && flySpeed <= 1.0f) {
             player.setFlySpeed(flySpeed);
@@ -207,6 +227,9 @@ public final class PlayerRecoveryStore {
         data.remove(collidableKey);
         data.remove(invisibleKey);
         data.remove(affectsSpawningKey);
+        data.remove(poseKey);
+        data.remove(fixedPoseKey);
+        data.remove(noPhysicsKey);
         data.remove(worldKey);
         data.remove(xKey);
         data.remove(yKey);
