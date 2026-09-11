@@ -45,11 +45,13 @@ class MessageResourcesTest {
         assertEquals(1, messages.getInt("config-version"));
 
         YamlConfiguration config = load("src/main/resources/config.yml");
-        assertEquals(11, config.getInt("config-version"));
+        assertEquals(12, config.getInt("config-version"));
         assertTrue(!config.contains("camera.mounted-client-game-mode"));
-        assertEquals("DIRECT_ENTITY", config.getString("camera.mode"));
+        assertEquals("CAMERA_RIG", config.getString("camera.mode"));
         assertEquals(8, config.getInt("camera.attach-retries"));
         assertTrue(!config.getBoolean("camera.fallback-to-spectator-target"));
+        assertTrue(config.getBoolean("camera.rig.adaptive-third-person-distance"));
+        assertTrue(config.getDouble("camera.rig.third-person-maximum") >= config.getDouble("camera.rig.third-person-minimum"));
         assertTrue(config.getBoolean("vision.warden.enabled"));
         assertEquals(12.0, config.getDouble("vision.warden.entity-hard-limit"));
         assertTrue(config.getInt("vision.warden.evaluation-interval-ticks") >= 1);
