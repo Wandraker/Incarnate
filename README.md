@@ -94,7 +94,7 @@ When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible 
 
 This means tuned movement speeds, cooldowns, camera choices, release behavior, excluded mobs and other existing settings are not reset merely because a later release adds new options.
 
-## What 0.8.0 implements
+## Current implementation
 
 ### Real bodies
 
@@ -332,8 +332,9 @@ Incarnate is proprietary software distributed under the **Incarnate All Rights R
 In short:
 
 - official releases may be downloaded and used, including on monetized Minecraft servers;
-- exact, complete and unmodified official release packages may be shared free of charge;
-- modified builds, rebranding, derivative versions and redistributed forks are not permitted without prior written permission from Onelsey;
-- all rights not explicitly granted remain reserved.
+- exact, complete and unmodified official release packages may be shared;
+- the source may be viewed for transparency, auditing and contribution preparation;
+- public forks, redistributed source trees, modified builds, rebranding, resale and derivative distributions are prohibited without permission;
+- contributions require an explicit license grant to Onelsey.
 
-See [`LICENSE`](LICENSE) for the complete terms.
+See `LICENSE` for the exact terms.
