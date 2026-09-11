@@ -142,6 +142,7 @@ public final class SessionListener implements Listener {
             return;
         }
         if (event.getDismounted().getUniqueId().equals(session.vesselId()) && event.isCancellable()) {
+            session.markSpectatorShiftAttempt();
             event.setCancelled(true);
         }
     }

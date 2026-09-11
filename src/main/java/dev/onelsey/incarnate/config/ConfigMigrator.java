@@ -12,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
 public final class ConfigMigrator {
-    private static final int CURRENT_SCHEMA = 8;
+    private static final int CURRENT_SCHEMA = 9;
 
     private ConfigMigrator() {
     }

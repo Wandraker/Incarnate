@@ -1,4 +1,4 @@
-config-version: 8
+config-version: 9
 
 control:
   max-possession-distance: 8.0
@@ -6,6 +6,7 @@ control:
 
 camera:
   mode: MOUNTED
+  mounted-client-game-mode: ADVENTURE
   mount-retries: 8
   fallback-to-spectator-target: true
 

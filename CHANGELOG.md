@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0-dev.5 - Mounted Vanilla Input Recovery
+
+- Fixes the root cause of dead `F` / `Shift + F` controls in the default mounted camera: the server still keeps the controller in spectator mode for safety, while the client is presented as Adventure during a successful mounted possession so vanilla emits ordinary swap-offhand and sprint input again.
+- Restores the real client game mode whenever possession ends and explicitly returns the client to Spectator when the legacy spectator-target camera is used.
+- Records cancelled mounted dismount attempts as a short Shift latch, making `Shift + F` release reliable even when the F packet and sneak state arrive on adjacent ticks.
+- Keeps existing left-click abilities and the server-side spectator safety model unchanged.
+- Adds `camera.mounted-client-game-mode`, defaulting to `ADVENTURE`; `SPECTATOR` is rejected because it suppresses the vanilla input this bridge exists to recover.
+- Advances gameplay config schema to 9 additively; existing values remain preserved.
+
 ## 0.9.0-dev.4 - Runtime Input & Vision Polish
 
 - Fixes spectator `F` decoding against Minecraft 26.2 by using the packet's public action accessor before the compatibility field fallback.
