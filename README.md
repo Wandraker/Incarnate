@@ -86,13 +86,14 @@ Gameplay configuration is versioned separately with `config-version`.
 
 When an existing `plugins/Incarnate/config.yml` is opened by a newer compatible Incarnate build:
 
-- existing values are kept exactly as the server configured them;
+- ordinary tuned gameplay values are preserved unless a schema migration explicitly replaces an obsolete setting;
 - only settings missing from the old file are copied from the new bundled defaults;
+- targeted migrations can rename or retire settings whose old semantics are no longer safe or correct;
 - before the first migration write, the original file is backed up under `plugins/Incarnate/backups/`;
 - the migrated file is written through a temporary file and atomic replace when the filesystem supports it;
 - a configuration from a newer unsupported schema is rejected rather than silently downgraded.
 
-This means tuned movement speeds, cooldowns, camera choices, release behavior, excluded mobs and other existing settings are not reset merely because a later release adds new options.
+Schema 11 intentionally migrates the former default `camera.mode: MOUNTED` to `DIRECT_ENTITY` and carries `camera.mount-retries` into `camera.attach-retries`, because the passenger camera is now a legacy compatibility mode rather than the recommended possession path.
 
 ## Current implementation
 
@@ -295,7 +296,7 @@ Special-state restoration includes sitting state, Bat awake state, Camel dash, C
 
 On normal release, a pre-possession combat target is restored only when it is still alive and safely owned by the same Folia region.
 
-The Player's original game mode, flight permission/state, fly speed, invulnerability, collision state, mob-spawn influence, world, location and rotation are stored for interrupted recovery. Recovery remains pending if the saved world is temporarily unavailable.
+The Player's original game mode, flight permission/state, fly speed, invulnerability, collision flag, spawning influence, world, location and rotation are stored for interrupted recovery. Recovery remains pending if the saved world is temporarily unavailable.
 
 ### AI suppression note
 
@@ -330,9 +331,10 @@ Incarnate is proprietary software distributed under the **Incarnate All Rights R
 In short:
 
 - official releases may be downloaded and used, including on monetized Minecraft servers;
-- exact, complete and unmodified official release packages may be shared;
-- the source may be viewed for transparency, auditing and contribution preparation;
-- public forks, redistributed source trees, modified builds, rebranding, resale and derivative distributions are prohibited without permission;
-- contributions require an explicit license grant to Onelsey.
+- exact, complete and unmodified official release packages may be shared for free;
+- server owners may configure the plugin and create translations for their own use;
+- source code may be viewed for transparency and security review;
+- third parties may not publish forks, modified builds, rebrands, ports, source-derived competing products or paid/resold copies without explicit permission from Onelsey;
+- contribution submission does not grant redistribution rights.
 
-See `LICENSE` for the exact terms.
+See `LICENSE` for the complete terms.
