@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "dev.onelsey"
-version = "0.7.1"
+version = "0.8.1-alpha.4"
 
 repositories {
     mavenCentral()
@@ -15,8 +15,10 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.2.build.121-stable")
+    compileOnly("io.netty:netty-transport:4.2.15.Final")
 
     testImplementation("io.papermc.paper:paper-api:26.2.build.121-stable")
+    testImplementation("io.netty:netty-transport:4.2.15.Final")
     testImplementation(platform("org.junit:junit-bom:6.0.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

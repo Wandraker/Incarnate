@@ -45,7 +45,7 @@ class MessageResourcesTest {
         assertEquals(1, messages.getInt("config-version"));
 
         YamlConfiguration config = load("src/main/resources/config.yml");
-        assertEquals(4, config.getInt("config-version"));
+        assertEquals(5, config.getInt("config-version"));
     }
 
     @Test

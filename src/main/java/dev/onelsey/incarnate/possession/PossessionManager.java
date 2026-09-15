@@ -20,10 +20,14 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.Axolotl;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Fox;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+
+import org.bukkit.util.Vector;
 
 import java.util.List;
 import java.util.Locale;
@@ -312,7 +316,7 @@ public final class PossessionManager {
             player.setGameMode(GameMode.SPECTATOR);
             try {
                 player.setSpectatorTarget(null);
-            } catch (IllegalStateException ignored) {
+            } catch (IllegalStateException | IllegalArgumentException ignored) {
             }
 
             if (cameraMode == CameraTransport.SPECTATOR_TARGET) {
@@ -443,7 +447,7 @@ public final class PossessionManager {
             session.cameraTransport(CameraTransport.SPECTATOR_TARGET);
             try {
                 player.setSpectatorTarget(vessel);
-            } catch (IllegalStateException ex) {
+            } catch (IllegalStateException | IllegalArgumentException ex) {
                 requestRelease(session, ReleaseReason.VESSEL_REMOVED);
                 return;
             }
@@ -587,7 +591,11 @@ public final class PossessionManager {
             session.advanceControlTick();
             updateVesselTelemetry(session, vessel);
             try {
-                controller.tick(session, vessel);
+                if (bodyStateLocksMovement(session, vessel)) {
+                    vessel.setVelocity(new Vector());
+                } else {
+                    controller.tick(session, vessel);
+                }
                 session.lastKnownVesselLocation(vessel.getLocation());
             } catch (Throwable ex) {
                 task.cancel();
@@ -611,6 +619,11 @@ public final class PossessionManager {
         if (controlTask == null) {
             requestRelease(session, ReleaseReason.VESSEL_REMOVED);
         }
+    }
+
+    private static boolean bodyStateLocksMovement(PossessionSession session, Mob vessel) {
+        return vessel instanceof Axolotl axolotl && (session.axolotlPlayingDeadControlled() || axolotl.isPlayingDead())
+            || vessel instanceof Fox fox && (session.foxSleepingControlled() || fox.isSleeping());
     }
 
     private static void updateVesselTelemetry(PossessionSession session, Mob vessel) {
@@ -779,7 +792,7 @@ public final class PossessionManager {
             if (player.getGameMode() == GameMode.SPECTATOR) {
                 try {
                     player.setSpectatorTarget(null);
-                } catch (IllegalStateException ignored) {
+                } catch (IllegalStateException | IllegalArgumentException ignored) {
                 }
             }
             session.cameraTeleportInProgress(false);
@@ -842,7 +855,7 @@ public final class PossessionManager {
         if (player.getGameMode() == GameMode.SPECTATOR) {
             try {
                 player.setSpectatorTarget(null);
-            } catch (IllegalStateException ignored) {
+            } catch (IllegalStateException | IllegalArgumentException ignored) {
             }
         }
         restorePlayerState(player, session.playerState());
@@ -988,7 +1001,7 @@ public final class PossessionManager {
                 if (player.getGameMode() == GameMode.SPECTATOR) {
                     try {
                         player.setSpectatorTarget(null);
-                    } catch (IllegalStateException ignored) {
+                    } catch (IllegalStateException | IllegalArgumentException ignored) {
                     }
                 }
                 restorePlayerState(player, session.playerState());
